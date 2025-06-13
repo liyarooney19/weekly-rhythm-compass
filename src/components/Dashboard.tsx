@@ -1,11 +1,34 @@
-
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
-import { Timer, Target, BookOpen, FileText } from 'lucide-react';
+import { Timer, Target, BookOpen, FileText, Gamepad2, Calendar, Trash2 } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
 
 export const Dashboard = () => {
+  const { toast } = useToast();
+
+  const resetAllData = () => {
+    // Clear all localStorage data
+    localStorage.removeItem('strategySession');
+    localStorage.removeItem('projects');
+    localStorage.removeItem('timeLogs');
+    localStorage.removeItem('weeklyTasks');
+    localStorage.removeItem('leisureActivities');
+    localStorage.removeItem('writingNotes');
+    localStorage.removeItem('readingList');
+    
+    toast({
+      title: "Success",
+      description: "All data has been reset. You can now start fresh!"
+    });
+    
+    // Reload the page to reflect changes
+    window.location.reload();
+  };
+
   // Mock data for demonstration
   const weeklyProgress = {
     totalHours: 28.5,
@@ -28,8 +51,51 @@ export const Dashboard = () => {
     <div className="space-y-6">
       <div>
         <h1 className="text-3xl font-bold text-slate-800 mb-2">Dashboard</h1>
-        <p className="text-slate-600">Your weekly progress and insights</p>
+        <p className="text-slate-600">Welcome to your personal development operating system</p>
       </div>
+
+      {/* Reset Data Section */}
+      <Card className="border-red-200">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-red-700">
+            <Trash2 className="h-5 w-5" />
+            Reset All Data
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="text-slate-600 mb-4">
+            Clear all your data and start fresh. This will remove all projects, tasks, time logs, notes, and other data.
+          </p>
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button variant="destructive">
+                <Trash2 className="h-4 w-4 mr-2" />
+                Reset All Data
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  This action cannot be undone. This will permanently delete all your:
+                  <br />• Projects and tasks
+                  <br />• Time tracking logs
+                  <br />• Notes and reading list
+                  <br />• Strategy session data
+                  <br />• Weekly planning data
+                  <br />• Leisure activities
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction onClick={resetAllData} className="bg-red-600 hover:bg-red-700">
+                  Yes, reset everything
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        </CardContent>
+      </Card>
 
       {/* Weekly Time Summary */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
