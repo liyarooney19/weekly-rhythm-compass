@@ -324,7 +324,7 @@ export const TimeTracker = () => {
                       <SelectValue placeholder="Select a task (optional)..." />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">General project work</SelectItem>
+                      <SelectItem value="general">General project work</SelectItem>
                       {availableTasks.map((task) => (
                         <SelectItem key={`task-select-${task.id}`} value={task.id.toString()}>
                           {task.name}
