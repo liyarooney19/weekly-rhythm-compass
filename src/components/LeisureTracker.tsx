@@ -197,6 +197,12 @@ export const LeisureTracker = () => {
         id: Date.now() + Math.random(),
         name: activity.name,
         lifeArea: 'Leisure',
+        description: activity.intention,
+        status: 'active',
+        progress: 0,
+        totalHours: 0,
+        investedHours: 0,
+        spentHours: 0,
         tasks: []
       };
       projects.push(leisureProject);
@@ -277,6 +283,33 @@ export const LeisureTracker = () => {
     const logs = savedLogs ? JSON.parse(savedLogs) : [];
     logs.push(timeLog);
     localStorage.setItem('timeLogs', JSON.stringify(logs));
+
+    // Update the project hours in the projects list
+    updateLeisureProjectHours(activity.name, duration);
+  };
+
+  const updateLeisureProjectHours = (activityName: string, durationMinutes: number) => {
+    const savedProjects = localStorage.getItem('projects');
+    if (!savedProjects) return;
+
+    try {
+      const projects = JSON.parse(savedProjects);
+      const hours = durationMinutes / 60;
+      
+      const updatedProjects = projects.map((project: any) => {
+        if (project.name.toLowerCase() === activityName.toLowerCase() && project.lifeArea === 'Leisure') {
+          return {
+            ...project,
+            investedHours: (project.investedHours || 0) + hours
+          };
+        }
+        return project;
+      });
+      
+      localStorage.setItem('projects', JSON.stringify(updatedProjects));
+    } catch (error) {
+      console.error('Error updating leisure project hours:', error);
+    }
   };
 
   const openSessionDialog = (activityId: number) => {
