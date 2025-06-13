@@ -5,26 +5,188 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Play, Pause, Square, Timer, Target, Clock } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
+
+interface Project {
+  id: number;
+  name: string;
+  lifeArea: string;
+  tasks: Task[];
+}
+
+interface Task {
+  id: number;
+  name: string;
+  completed: boolean;
+  estimatedHours: number;
+  investedHours: number;
+  spentHours: number;
+}
+
+interface TimeLog {
+  project: string;
+  task?: string;
+  duration: number;
+  type: 'invested' | 'spent';
+  timestamp: string;
+  projectId?: number;
+  taskId?: number;
+}
 
 export const TimeTracker = () => {
   const [isRunning, setIsRunning] = useState(false);
-  const [seconds, setSeconds] = useState(25 * 60); // 25 minutes default
+  const [seconds, setSeconds] = useState(25 * 60);
   const [selectedProject, setSelectedProject] = useState('');
+  const [selectedTask, setSelectedTask] = useState('');
   const [timeType, setTimeType] = useState<'invested' | 'spent'>('invested');
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [recentLogs, setRecentLogs] = useState<TimeLog[]>([]);
+  const { toast } = useToast();
 
-  // Mock projects
-  const projects = [
-    { id: '1', name: 'Fitness App', lifeArea: 'startup' },
-    { id: '2', name: 'Learn React', lifeArea: 'work' },
-    { id: '3', name: 'Blog Writing', lifeArea: 'personal' },
-  ];
+  // Load projects and check for current timer task
+  useEffect(() => {
+    loadProjects();
+    loadRecentLogs();
+    
+    // Check if there's a current timer task from projects view
+    const currentTask = localStorage.getItem('currentTimerTask');
+    if (currentTask) {
+      try {
+        const taskData = JSON.parse(currentTask);
+        setSelectedProject(taskData.projectId.toString());
+        setSelectedTask(taskData.taskId.toString());
+        localStorage.removeItem('currentTimerTask'); // Clear after setting
+        
+        toast({
+          title: "Timer Set",
+          description: `Ready to track time for "${taskData.taskName}"`
+        });
+      } catch (error) {
+        console.error('Error loading current task:', error);
+      }
+    }
+  }, []);
 
-  // Recent time logs (mock data)
-  const recentLogs = [
-    { project: 'Fitness App', duration: 25, type: 'invested', timestamp: '10:30 AM' },
-    { project: 'Learn React', duration: 25, type: 'invested', timestamp: '9:00 AM' },
-    { project: 'Social Media', duration: 15, type: 'spent', timestamp: '8:45 AM' },
-  ];
+  const loadProjects = () => {
+    const savedStrategy = localStorage.getItem('strategySession');
+    const savedProjects = localStorage.getItem('projects');
+    let allProjects: Project[] = [];
+    
+    // Load from strategy session
+    if (savedStrategy) {
+      try {
+        const data = JSON.parse(savedStrategy);
+        if (data.projects) {
+          const strategyProjects = data.projects
+            .filter((p: any) => p.name.trim() !== '')
+            .map((p: any, index: number) => ({
+              id: index + 100,
+              name: p.name,
+              lifeArea: p.lifeArea,
+              tasks: []
+            }));
+          allProjects = [...allProjects, ...strategyProjects];
+        }
+      } catch (error) {
+        console.error('Error loading strategy projects:', error);
+      }
+    }
+
+    // Load from saved projects
+    if (savedProjects) {
+      try {
+        const projects = JSON.parse(savedProjects);
+        allProjects = [...allProjects, ...projects];
+      } catch (error) {
+        console.error('Error loading saved projects:', error);
+      }
+    }
+
+    setProjects(allProjects);
+  };
+
+  const loadRecentLogs = () => {
+    const savedLogs = localStorage.getItem('timeLogs');
+    if (savedLogs) {
+      try {
+        const logs = JSON.parse(savedLogs);
+        const today = new Date().toDateString();
+        const todayLogs = logs.filter((log: TimeLog) => {
+          const logDate = new Date(log.timestamp).toDateString();
+          return logDate === today;
+        });
+        setRecentLogs(todayLogs.slice(-10)); // Show last 10 logs
+      } catch (error) {
+        console.error('Error loading time logs:', error);
+      }
+    }
+  };
+
+  const saveTimeLog = (duration: number) => {
+    const project = projects.find(p => p.id.toString() === selectedProject);
+    const task = project?.tasks.find(t => t.id.toString() === selectedTask);
+    
+    if (!project) return;
+
+    const timeLog: TimeLog = {
+      project: project.name,
+      task: task?.name,
+      duration: Math.round(duration / 60), // Convert seconds to minutes
+      type: timeType,
+      timestamp: new Date().toISOString(),
+      projectId: project.id,
+      taskId: task?.id
+    };
+
+    // Save to logs
+    const savedLogs = localStorage.getItem('timeLogs');
+    const logs = savedLogs ? JSON.parse(savedLogs) : [];
+    logs.push(timeLog);
+    localStorage.setItem('timeLogs', JSON.stringify(logs));
+
+    // Update project/task hours
+    if (task && project) {
+      updateTaskHours(project.id, task.id, timeLog.duration, timeType);
+    }
+
+    setRecentLogs(prev => [...prev, timeLog].slice(-10));
+    
+    toast({
+      title: "Time Logged",
+      description: `${timeLog.duration} minutes ${timeType} time logged for ${project.name}${task ? ` - ${task.name}` : ''}`
+    });
+  };
+
+  const updateTaskHours = (projectId: number, taskId: number, minutes: number, type: 'invested' | 'spent') => {
+    const savedProjects = localStorage.getItem('projects');
+    if (!savedProjects) return;
+
+    try {
+      const projects = JSON.parse(savedProjects);
+      const updatedProjects = projects.map((project: any) => {
+        if (project.id === projectId) {
+          const updatedTasks = project.tasks.map((task: any) => {
+            if (task.id === taskId) {
+              const hours = minutes / 60;
+              return {
+                ...task,
+                [type === 'invested' ? 'investedHours' : 'spentHours']: 
+                  (task[type === 'invested' ? 'investedHours' : 'spentHours'] || 0) + hours
+              };
+            }
+            return task;
+          });
+          return { ...project, tasks: updatedTasks };
+        }
+        return project;
+      });
+      
+      localStorage.setItem('projects', JSON.stringify(updatedProjects));
+      loadProjects(); // Reload to get updated data
+    } catch (error) {
+      console.error('Error updating task hours:', error);
+    }
+  };
 
   useEffect(() => {
     let interval: NodeJS.Timeout;
@@ -34,7 +196,8 @@ export const TimeTracker = () => {
       }, 1000);
     } else if (seconds === 0) {
       setIsRunning(false);
-      // Here you would typically log the completed session
+      const sessionLength = 25 * 60; // Default session length
+      saveTimeLog(sessionLength);
     }
     return () => clearInterval(interval);
   }, [isRunning, seconds]);
@@ -48,6 +211,12 @@ export const TimeTracker = () => {
   const startTimer = () => {
     if (selectedProject) {
       setIsRunning(true);
+    } else {
+      toast({
+        title: "Select Project",
+        description: "Please select a project before starting the timer",
+        variant: "destructive"
+      });
     }
   };
 
@@ -56,15 +225,23 @@ export const TimeTracker = () => {
   };
 
   const stopTimer = () => {
+    if (isRunning || seconds < 25 * 60) {
+      const elapsed = (25 * 60) - seconds;
+      if (elapsed > 60) { // Only log if more than 1 minute
+        saveTimeLog(elapsed);
+      }
+    }
     setIsRunning(false);
     setSeconds(25 * 60);
-    // Here you would log the session
   };
 
   const resetTimer = (minutes: number) => {
     setIsRunning(false);
     setSeconds(minutes * 60);
   };
+
+  const selectedProjectData = projects.find(p => p.id.toString() === selectedProject);
+  const availableTasks = selectedProjectData?.tasks || [];
 
   return (
     <div className="space-y-6">
@@ -109,13 +286,32 @@ export const TimeTracker = () => {
                   </SelectTrigger>
                   <SelectContent>
                     {projects.map((project) => (
-                      <SelectItem key={project.id} value={project.id}>
+                      <SelectItem key={project.id} value={project.id.toString()}>
                         {project.name} ({project.lifeArea})
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </div>
+
+              {selectedProjectData && availableTasks.length > 0 && (
+                <div>
+                  <label className="block text-sm font-medium mb-2">Task (Optional)</label>
+                  <Select value={selectedTask} onValueChange={setSelectedTask}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select a task..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="">No specific task</SelectItem>
+                      {availableTasks.map((task) => (
+                        <SelectItem key={task.id} value={task.id.toString()}>
+                          {task.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
 
               <div>
                 <label className="block text-sm font-medium mb-2">Time Type</label>
@@ -167,20 +363,27 @@ export const TimeTracker = () => {
           </CardHeader>
           <CardContent>
             <div className="space-y-3">
-              {recentLogs.map((log, index) => (
-                <div key={index} className="flex justify-between items-center p-3 bg-slate-50 rounded-lg">
-                  <div>
-                    <div className="font-medium">{log.project}</div>
-                    <div className="text-sm text-slate-500">{log.timestamp}</div>
+              {recentLogs.length === 0 ? (
+                <p className="text-slate-500 text-center py-4">No sessions logged today</p>
+              ) : (
+                recentLogs.map((log, index) => (
+                  <div key={index} className="flex justify-between items-center p-3 bg-slate-50 rounded-lg">
+                    <div>
+                      <div className="font-medium">{log.project}</div>
+                      {log.task && <div className="text-sm text-slate-600">{log.task}</div>}
+                      <div className="text-sm text-slate-500">
+                        {new Date(log.timestamp).toLocaleTimeString()}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="font-mono font-medium">{log.duration}min</span>
+                      <Badge variant={log.type === 'invested' ? 'default' : 'secondary'}>
+                        {log.type}
+                      </Badge>
+                    </div>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <span className="font-mono font-medium">{log.duration}min</span>
-                    <Badge variant={log.type === 'invested' ? 'default' : 'secondary'}>
-                      {log.type}
-                    </Badge>
-                  </div>
-                </div>
-              ))}
+                ))
+              )}
             </div>
           </CardContent>
         </Card>
@@ -193,22 +396,27 @@ export const TimeTracker = () => {
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {projects.map((project) => (
-              <div key={project.id} className="p-4 border border-slate-200 rounded-lg">
-                <div className="font-medium mb-2">{project.name}</div>
-                <div className="text-sm text-slate-500 mb-3">{project.lifeArea}</div>
-                <div className="space-y-1">
-                  <div className="flex justify-between">
-                    <span className="text-sm">Invested:</span>
-                    <span className="font-mono text-green-600">8.5h</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-sm">Spent:</span>
-                    <span className="font-mono text-amber-600">1.2h</span>
+            {projects.slice(0, 6).map((project) => {
+              const totalInvested = project.tasks?.reduce((sum, task) => sum + (task.investedHours || 0), 0) || 0;
+              const totalSpent = project.tasks?.reduce((sum, task) => sum + (task.spentHours || 0), 0) || 0;
+              
+              return (
+                <div key={project.id} className="p-4 border border-slate-200 rounded-lg">
+                  <div className="font-medium mb-2">{project.name}</div>
+                  <div className="text-sm text-slate-500 mb-3">{project.lifeArea}</div>
+                  <div className="space-y-1">
+                    <div className="flex justify-between">
+                      <span className="text-sm">Invested:</span>
+                      <span className="font-mono text-green-600">{totalInvested.toFixed(1)}h</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-sm">Spent:</span>
+                      <span className="font-mono text-amber-600">{totalSpent.toFixed(1)}h</span>
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </CardContent>
       </Card>
