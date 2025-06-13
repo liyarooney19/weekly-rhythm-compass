@@ -1,4 +1,5 @@
-import React from 'react';
+
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
@@ -9,6 +10,32 @@ import { useToast } from '@/hooks/use-toast';
 
 export const Dashboard = () => {
   const { toast } = useToast();
+  const [projects, setProjects] = useState<any[]>([]);
+  const [readingItems, setReadingItems] = useState<any[]>([]);
+  const [leisureActivities, setLeisureActivities] = useState<any[]>([]);
+  const [timeLogs, setTimeLogs] = useState<any[]>([]);
+
+  useEffect(() => {
+    loadData();
+  }, []);
+
+  const loadData = () => {
+    // Load projects
+    const savedProjects = localStorage.getItem('projects');
+    setProjects(savedProjects ? JSON.parse(savedProjects) : []);
+
+    // Load reading items
+    const savedReadingItems = localStorage.getItem('readingItems');
+    setReadingItems(savedReadingItems ? JSON.parse(savedReadingItems) : []);
+
+    // Load leisure activities
+    const savedLeisureActivities = localStorage.getItem('leisureActivities');
+    setLeisureActivities(savedLeisureActivities ? JSON.parse(savedLeisureActivities) : []);
+
+    // Load time logs
+    const savedTimeLogs = localStorage.getItem('timeLogs');
+    setTimeLogs(savedTimeLogs ? JSON.parse(savedTimeLogs) : []);
+  };
 
   const resetAllData = () => {
     // Clear all localStorage data
@@ -19,6 +46,7 @@ export const Dashboard = () => {
     localStorage.removeItem('leisureActivities');
     localStorage.removeItem('writingNotes');
     localStorage.removeItem('readingList');
+    localStorage.removeItem('readingItems');
     
     toast({
       title: "Success",
@@ -29,23 +57,48 @@ export const Dashboard = () => {
     window.location.reload();
   };
 
-  // Mock data for demonstration
-  const weeklyProgress = {
-    totalHours: 28.5,
-    investedHours: 22.3,
-    spentHours: 6.2,
+  // Calculate weekly progress from actual data
+  const calculateWeeklyProgress = () => {
+    const oneWeekAgo = new Date();
+    oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
+    
+    const weeklyLogs = timeLogs.filter(log => 
+      new Date(log.timestamp) >= oneWeekAgo
+    );
+    
+    const totalHours = weeklyLogs.reduce((sum, log) => sum + (log.duration / 60), 0);
+    const investedHours = weeklyLogs
+      .filter(log => log.type === 'invested')
+      .reduce((sum, log) => sum + (log.duration / 60), 0);
+    const spentHours = weeklyLogs
+      .filter(log => log.type === 'spent')
+      .reduce((sum, log) => sum + (log.duration / 60), 0);
+
+    return {
+      totalHours: totalHours.toFixed(1),
+      investedHours: investedHours.toFixed(1),
+      spentHours: spentHours.toFixed(1),
+      investedPercentage: totalHours > 0 ? Math.round((investedHours / totalHours) * 100) : 0,
+      spentPercentage: totalHours > 0 ? Math.round((spentHours / totalHours) * 100) : 0
+    };
   };
 
-  const projectSummary = [
-    { name: 'Fitness App', hours: 8.5, category: 'Startup', progress: 65 },
-    { name: 'Learn React', hours: 6.2, category: 'Work', progress: 40 },
-    { name: 'Blog Writing', hours: 4.1, category: 'Personal', progress: 80 },
-  ];
+  const weeklyProgress = calculateWeeklyProgress();
 
-  const upcomingReminders = [
-    { type: 'Strategy Session', due: 'Tomorrow', urgent: true },
-    { type: 'Weekly Review', due: 'Sunday', urgent: false },
-  ];
+  // Get active projects with progress
+  const getActiveProjects = () => {
+    return projects
+      .filter(project => project.status === 'active')
+      .slice(0, 3)
+      .map(project => ({
+        name: project.name,
+        hours: project.investedHours || 0,
+        category: project.lifeArea || 'General',
+        progress: project.progress || 0
+      }));
+  };
+
+  const activeProjects = getActiveProjects();
 
   return (
     <div className="space-y-6">
@@ -117,7 +170,7 @@ export const Dashboard = () => {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-green-600">{weeklyProgress.investedHours}h</div>
-            <p className="text-xs text-slate-500">78% of total time</p>
+            <p className="text-xs text-slate-500">{weeklyProgress.investedPercentage}% of total time</p>
           </CardContent>
         </Card>
 
@@ -128,33 +181,35 @@ export const Dashboard = () => {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-amber-600">{weeklyProgress.spentHours}h</div>
-            <p className="text-xs text-slate-500">22% of total time</p>
+            <p className="text-xs text-slate-500">{weeklyProgress.spentPercentage}% of total time</p>
           </CardContent>
         </Card>
       </div>
 
       {/* Project Progress */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Active Projects</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            {projectSummary.map((project, index) => (
-              <div key={index} className="space-y-2">
-                <div className="flex justify-between items-center">
-                  <div className="flex items-center gap-2">
-                    <span className="font-medium">{project.name}</span>
-                    <Badge variant="secondary">{project.category}</Badge>
+      {activeProjects.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Active Projects</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              {activeProjects.map((project, index) => (
+                <div key={index} className="space-y-2">
+                  <div className="flex justify-between items-center">
+                    <div className="flex items-center gap-2">
+                      <span className="font-medium">{project.name}</span>
+                      <Badge variant="secondary">{project.category}</Badge>
+                    </div>
+                    <span className="text-sm text-slate-500">{project.hours.toFixed(1)}h</span>
                   </div>
-                  <span className="text-sm text-slate-500">{project.hours}h</span>
+                  <Progress value={project.progress} className="h-2" />
                 </div>
-                <Progress value={project.progress} className="h-2" />
-              </div>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Quick Stats */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -167,9 +222,18 @@ export const Dashboard = () => {
           </CardHeader>
           <CardContent>
             <div className="space-y-2">
-              <div className="text-lg font-semibold">3 books in progress</div>
-              <div className="text-sm text-slate-500">12 articles read</div>
-              <div className="text-sm text-slate-500">5 hours of podcasts</div>
+              {readingItems.length > 0 ? (
+                <>
+                  <div className="text-lg font-semibold">{readingItems.length} items in progress</div>
+                  <div className="text-sm text-slate-500">
+                    {readingItems.filter(item => item.type === 'book').length} books, {' '}
+                    {readingItems.filter(item => item.type === 'article').length} articles, {' '}
+                    {readingItems.filter(item => item.type === 'podcast').length} podcasts
+                  </div>
+                </>
+              ) : (
+                <div className="text-lg font-semibold text-slate-500">No reading items yet</div>
+              )}
             </div>
           </CardContent>
         </Card>
@@ -177,39 +241,46 @@ export const Dashboard = () => {
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <FileText className="h-5 w-5" />
-              Notes & Ideas
+              <Gamepad2 className="h-5 w-5" />
+              Leisure Activities
             </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="space-y-2">
-              <div className="text-lg font-semibold">8 new notes</div>
-              <div className="text-sm text-slate-500">3 voice memos</div>
-              <div className="text-sm text-slate-500">2 ready for cleanup</div>
+              {leisureActivities.length > 0 ? (
+                <>
+                  <div className="text-lg font-semibold">{leisureActivities.length} active activities</div>
+                  <div className="text-sm text-slate-500">
+                    {leisureActivities.reduce((sum, activity) => sum + activity.totalHours, 0).toFixed(1)} hours total
+                  </div>
+                </>
+              ) : (
+                <div className="text-lg font-semibold text-slate-500">No leisure activities yet</div>
+              )}
             </div>
           </CardContent>
         </Card>
       </div>
 
-      {/* Reminders */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Upcoming</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-3">
-            {upcomingReminders.map((reminder, index) => (
-              <div key={index} className="flex justify-between items-center p-3 rounded-lg bg-slate-50">
-                <div>
-                  <span className="font-medium">{reminder.type}</span>
-                  {reminder.urgent && <Badge className="ml-2" variant="destructive">Urgent</Badge>}
-                </div>
-                <span className="text-sm text-slate-500">{reminder.due}</span>
-              </div>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
+      {/* Getting Started Message */}
+      {projects.length === 0 && readingItems.length === 0 && leisureActivities.length === 0 && (
+        <Card className="border-blue-200 bg-blue-50">
+          <CardHeader>
+            <CardTitle className="text-blue-800">Welcome! Let's get started</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-blue-700 mb-4">
+              Your dashboard is empty because you haven't created any projects, reading items, or leisure activities yet.
+            </p>
+            <div className="space-y-2 text-sm text-blue-600">
+              <p>• Start with the <strong>Strategy Session</strong> to define your life areas and create projects</p>
+              <p>• Add books and articles in the <strong>Reading</strong> section</p>
+              <p>• Track activities you enjoy in the <strong>Leisure</strong> section</p>
+              <p>• Use the <strong>Time Tracker</strong> to log your progress</p>
+            </div>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 };
