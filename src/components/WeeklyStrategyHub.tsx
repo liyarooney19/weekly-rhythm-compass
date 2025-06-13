@@ -7,6 +7,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Progress } from '@/components/ui/progress';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Calendar, CheckCircle2, Clock, ChevronDown, ChevronRight, Target, FileText, Timer, Settings2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
@@ -14,6 +15,7 @@ interface WeeklySession {
   id: string;
   date: string;
   completed: boolean;
+  completedItems: string[];
   notes: {
     notesReview: string;
     dissatisfactionsUpdate: string;
@@ -31,6 +33,7 @@ export const WeeklyStrategyHub = () => {
     id: '',
     date: '',
     completed: false,
+    completedItems: [],
     notes: {
       notesReview: '',
       dissatisfactionsUpdate: '',
@@ -99,16 +102,27 @@ export const WeeklyStrategyHub = () => {
     if (savedHistory) {
       setSessionHistory(JSON.parse(savedHistory));
     }
+
+    const savedCurrentSession = localStorage.getItem('currentWeeklySession');
+    if (savedCurrentSession) {
+      const parsed = JSON.parse(savedCurrentSession);
+      const currentWeek = getWeekId(new Date());
+      if (parsed.id === currentWeek && !parsed.completed) {
+        setCurrentSession(parsed);
+        return;
+      }
+    }
   };
 
   const initializeCurrentSession = () => {
     const today = new Date();
     const currentWeek = getWeekId(today);
     
-    setCurrentSession({
+    const newSession = {
       id: currentWeek,
       date: today.toISOString(),
       completed: false,
+      completedItems: [],
       notes: {
         notesReview: '',
         dissatisfactionsUpdate: '',
@@ -117,7 +131,10 @@ export const WeeklyStrategyHub = () => {
         tasksPlanning: '',
         pomodoroPlanning: ''
       }
-    });
+    };
+
+    setCurrentSession(newSession);
+    localStorage.setItem('currentWeeklySession', JSON.stringify(newSession));
   };
 
   const getWeekId = (date: Date) => {
@@ -153,13 +170,26 @@ export const WeeklyStrategyHub = () => {
   };
 
   const updateNote = (noteType: keyof typeof currentSession.notes, value: string) => {
-    setCurrentSession(prev => ({
-      ...prev,
+    const updatedSession = {
+      ...currentSession,
       notes: {
-        ...prev.notes,
+        ...currentSession.notes,
         [noteType]: value
       }
-    }));
+    };
+    setCurrentSession(updatedSession);
+    localStorage.setItem('currentWeeklySession', JSON.stringify(updatedSession));
+  };
+
+  const toggleItemCompletion = (itemId: string) => {
+    const updatedSession = {
+      ...currentSession,
+      completedItems: currentSession.completedItems.includes(itemId)
+        ? currentSession.completedItems.filter(id => id !== itemId)
+        : [...currentSession.completedItems, itemId]
+    };
+    setCurrentSession(updatedSession);
+    localStorage.setItem('currentWeeklySession', JSON.stringify(updatedSession));
   };
 
   const saveStrategyDay = (day: string) => {
@@ -181,6 +211,7 @@ export const WeeklyStrategyHub = () => {
     const updatedHistory = [completedSession, ...sessionHistory];
     setSessionHistory(updatedHistory);
     localStorage.setItem('weeklyStrategyHistory', JSON.stringify(updatedHistory));
+    localStorage.removeItem('currentWeeklySession');
 
     toast({
       title: "Weekly Strategy Session Completed",
@@ -193,8 +224,11 @@ export const WeeklyStrategyHub = () => {
   };
 
   const getCompletionPercentage = () => {
-    const completedSections = Object.values(currentSession.notes).filter(note => note.trim() !== '').length;
-    return Math.round((completedSections / agendaItems.length) * 100);
+    return Math.round((currentSession.completedItems.length / agendaItems.length) * 100);
+  };
+
+  const allItemsCompleted = () => {
+    return currentSession.completedItems.length === agendaItems.length;
   };
 
   return (
@@ -256,11 +290,11 @@ export const WeeklyStrategyHub = () => {
           <Progress value={getCompletionPercentage()} className="mb-4" />
           <div className="flex justify-between items-center">
             <span className="text-sm text-slate-600">
-              {Object.values(currentSession.notes).filter(note => note.trim() !== '').length} of {agendaItems.length} sections completed
+              {currentSession.completedItems.length} of {agendaItems.length} items completed
             </span>
             <Button 
               onClick={completeSession}
-              disabled={getCompletionPercentage() < 100}
+              disabled={!allItemsCompleted()}
               className="bg-green-600 hover:bg-green-700"
             >
               Complete Session
@@ -278,34 +312,44 @@ export const WeeklyStrategyHub = () => {
           {agendaItems.map(item => {
             const Icon = item.icon;
             const isOpen = openSections.includes(item.id);
-            const hasContent = currentSession.notes[item.id as keyof typeof currentSession.notes].trim() !== '';
+            const isCompleted = currentSession.completedItems.includes(item.id);
 
             return (
-              <Collapsible key={item.id} open={isOpen} onOpenChange={() => toggleSection(item.id)}>
-                <CollapsibleTrigger asChild>
-                  <Button variant="ghost" className="w-full justify-between p-4 h-auto">
-                    <div className="flex items-center gap-3">
-                      <Icon className={`h-5 w-5 ${hasContent ? 'text-green-600' : 'text-slate-400'}`} />
-                      <div className="text-left">
-                        <div className="font-medium">{item.title}</div>
-                        <div className="text-sm text-slate-500">{item.description}</div>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      {hasContent && <CheckCircle2 className="h-4 w-4 text-green-600" />}
-                      {isOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-                    </div>
-                  </Button>
-                </CollapsibleTrigger>
-                <CollapsibleContent className="px-4 pb-4">
-                  <Textarea
-                    placeholder={`Notes for: ${item.title}`}
-                    value={currentSession.notes[item.id as keyof typeof currentSession.notes]}
-                    onChange={(e) => updateNote(item.id as keyof typeof currentSession.notes, e.target.value)}
-                    className="min-h-[120px]"
+              <div key={item.id} className="border rounded-lg">
+                <div className="flex items-center gap-3 p-4">
+                  <Checkbox 
+                    checked={isCompleted}
+                    onCheckedChange={() => toggleItemCompletion(item.id)}
                   />
-                </CollapsibleContent>
-              </Collapsible>
+                  <Collapsible open={isOpen} onOpenChange={() => toggleSection(item.id)} className="flex-1">
+                    <CollapsibleTrigger asChild>
+                      <Button variant="ghost" className="w-full justify-between p-0 h-auto">
+                        <div className="flex items-center gap-3">
+                          <Icon className={`h-5 w-5 ${isCompleted ? 'text-green-600' : 'text-slate-400'}`} />
+                          <div className="text-left">
+                            <div className={`font-medium ${isCompleted ? 'line-through text-slate-500' : ''}`}>
+                              {item.title}
+                            </div>
+                            <div className="text-sm text-slate-500">{item.description}</div>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          {isCompleted && <CheckCircle2 className="h-4 w-4 text-green-600" />}
+                          {isOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                        </div>
+                      </Button>
+                    </CollapsibleTrigger>
+                    <CollapsibleContent className="px-0 pb-4">
+                      <Textarea
+                        placeholder={`Notes for: ${item.title}`}
+                        value={currentSession.notes[item.id as keyof typeof currentSession.notes]}
+                        onChange={(e) => updateNote(item.id as keyof typeof currentSession.notes, e.target.value)}
+                        className="min-h-[120px] mt-3"
+                      />
+                    </CollapsibleContent>
+                  </Collapsible>
+                </div>
+              </div>
             );
           })}
         </CardContent>
@@ -340,7 +384,7 @@ export const WeeklyStrategyHub = () => {
               )}
             </div>
           </CardContent>
-        </Card>
+        </div>
       )}
     </div>
   );
