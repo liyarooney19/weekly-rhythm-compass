@@ -1,10 +1,11 @@
+
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
-import { Timer, Target, BookOpen, FileText, Gamepad2, Calendar, Trash2 } from 'lucide-react';
+import { Timer, Target, BookOpen, FileText, Gamepad2, Calendar, Trash2, Settings, FolderOpen } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 export const Dashboard = () => {
@@ -13,6 +14,7 @@ export const Dashboard = () => {
   const [readingItems, setReadingItems] = useState<any[]>([]);
   const [leisureActivities, setLeisureActivities] = useState<any[]>([]);
   const [timeLogs, setTimeLogs] = useState<any[]>([]);
+  const [strategyDay, setStrategyDay] = useState('Sunday');
 
   useEffect(() => {
     loadData();
@@ -34,6 +36,12 @@ export const Dashboard = () => {
     // Load time logs
     const savedTimeLogs = localStorage.getItem('timeLogs');
     setTimeLogs(savedTimeLogs ? JSON.parse(savedTimeLogs) : []);
+
+    // Load strategy day
+    const savedStrategyDay = localStorage.getItem('weeklyStrategyDay');
+    if (savedStrategyDay) {
+      setStrategyDay(savedStrategyDay);
+    }
   };
 
   const resetAllData = () => {
@@ -46,6 +54,8 @@ export const Dashboard = () => {
     localStorage.removeItem('writingNotes');
     localStorage.removeItem('readingList');
     localStorage.removeItem('readingItems');
+    localStorage.removeItem('weeklyStrategyDay');
+    localStorage.removeItem('weeklyStrategyHistory');
     
     toast({
       title: "Success",
@@ -99,6 +109,26 @@ export const Dashboard = () => {
 
   const activeProjects = getActiveProjects();
 
+  // Check if strategy session is due
+  const isStrategySessionDue = () => {
+    const today = new Date();
+    const dayIndex = today.getDay();
+    const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    const targetDayIndex = days.indexOf(strategyDay);
+    return dayIndex === targetDayIndex;
+  };
+
+  const getNextStrategyDate = () => {
+    const today = new Date();
+    const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    const targetDayIndex = days.indexOf(strategyDay);
+    const todayIndex = today.getDay();
+    const daysUntil = (targetDayIndex - todayIndex + 7) % 7;
+    const nextSession = new Date(today);
+    nextSession.setDate(today.getDate() + (daysUntil === 0 ? 7 : daysUntil));
+    return nextSession.toLocaleDateString();
+  };
+
   return (
     <div className="space-y-6">
       <div>
@@ -106,8 +136,38 @@ export const Dashboard = () => {
         <p className="text-slate-600">Welcome to your personal development operating system</p>
       </div>
 
+      {/* Strategy Session Status */}
+      <Card className={isStrategySessionDue() ? "border-green-200 bg-green-50" : "border-blue-200 bg-blue-50"}>
+        <CardHeader>
+          <CardTitle className={`flex items-center gap-2 ${isStrategySessionDue() ? "text-green-800" : "text-blue-800"}`}>
+            <Settings className="h-5 w-5" />
+            Weekly Strategy Session
+            {isStrategySessionDue() && <Badge className="bg-green-600">Due Today</Badge>}
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className={isStrategySessionDue() ? "text-green-700" : "text-blue-700"}>
+            {isStrategySessionDue() 
+              ? `Your weekly strategy session is due today (${strategyDay})!`
+              : `Next session scheduled for ${getNextStrategyDate()} (${strategyDay})`
+            }
+          </p>
+        </CardContent>
+      </Card>
+
       {/* Weekly Time Summary */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Active Projects</CardTitle>
+            <FolderOpen className="h-4 w-4 text-slate-500" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{projects.filter(p => p.status === 'active').length}</div>
+            <p className="text-xs text-slate-500">Currently working on</p>
+          </CardContent>
+        </Card>
+
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Total Hours</CardTitle>
@@ -229,16 +289,17 @@ export const Dashboard = () => {
               Your dashboard is empty because you haven't created any projects, reading items, or leisure activities yet.
             </p>
             <div className="space-y-2 text-sm text-blue-600">
-              <p>• Start with the <strong>Strategy Session</strong> to define your life areas and create projects</p>
+              <p>• Start with the <strong>Initial Strategy Setup</strong> to define your life areas and create projects</p>
               <p>• Add books and articles in the <strong>Reading</strong> section</p>
               <p>• Track activities you enjoy in the <strong>Leisure</strong> section</p>
               <p>• Use the <strong>Time Tracker</strong> to log your progress</p>
+              <p>• Schedule regular <strong>Weekly Strategy</strong> sessions to stay on track</p>
             </div>
           </CardContent>
         </Card>
       )}
 
-      {/* Reset Data Section - Moved to bottom and made less prominent */}
+      {/* Reset Data Section */}
       <div className="pt-8 border-t border-slate-200">
         <div className="flex justify-end">
           <AlertDialog>

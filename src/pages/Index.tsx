@@ -3,6 +3,7 @@ import React, { useState } from 'react';
 import { Navigation } from '@/components/Navigation';
 import { Dashboard } from '@/components/Dashboard';
 import { StrategySession } from '@/components/StrategySession';
+import { WeeklyStrategyHub } from '@/components/WeeklyStrategyHub';
 import { ProjectsView } from '@/components/ProjectsView';
 import { TimeTracker } from '@/components/TimeTracker';
 import { ReadingTracker } from '@/components/ReadingTracker';
@@ -17,8 +18,10 @@ const Index = () => {
     switch (activeView) {
       case 'dashboard':
         return <Dashboard />;
-      case 'strategy':
+      case 'strategy-setup':
         return <StrategySession setActiveView={setActiveView} />;
+      case 'weekly-strategy':
+        return <WeeklyStrategyHub />;
       case 'projects':
         return <ProjectsView />;
       case 'timer':
