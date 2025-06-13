@@ -72,15 +72,27 @@ export const TimeTracker = () => {
     const savedProjects = localStorage.getItem('projects');
     let allProjects: Project[] = [];
     
-    // Load from strategy session
+    // Load from saved projects first (these have tasks)
+    if (savedProjects) {
+      try {
+        const projects = JSON.parse(savedProjects);
+        allProjects = [...projects];
+      } catch (error) {
+        console.error('Error loading saved projects:', error);
+      }
+    }
+
+    // Load from strategy session (these typically don't have tasks yet)
     if (savedStrategy) {
       try {
         const data = JSON.parse(savedStrategy);
         if (data.projects) {
+          const existingNames = new Set(allProjects.map(p => p.name.toLowerCase().trim()));
           const strategyProjects = data.projects
             .filter((p: any) => p.name.trim() !== '')
+            .filter((p: any) => !existingNames.has(p.name.toLowerCase().trim()))
             .map((p: any, index: number) => ({
-              id: index + 100,
+              id: Date.now() + index,
               name: p.name,
               lifeArea: p.lifeArea,
               tasks: []
@@ -89,16 +101,6 @@ export const TimeTracker = () => {
         }
       } catch (error) {
         console.error('Error loading strategy projects:', error);
-      }
-    }
-
-    // Load from saved projects
-    if (savedProjects) {
-      try {
-        const projects = JSON.parse(savedProjects);
-        allProjects = [...allProjects, ...projects];
-      } catch (error) {
-        console.error('Error loading saved projects:', error);
       }
     }
 
@@ -252,6 +254,17 @@ export const TimeTracker = () => {
   const selectedProjectData = projects.find(p => p.id.toString() === selectedProject);
   const availableTasks = selectedProjectData?.tasks || [];
 
+  // Clear selected task when project changes
+  useEffect(() => {
+    if (selectedProject && selectedProjectData) {
+      // If the selected task doesn't exist in the new project, clear it
+      const taskExists = availableTasks.some(t => t.id.toString() === selectedTask);
+      if (!taskExists) {
+        setSelectedTask('');
+      }
+    }
+  }, [selectedProject]);
+
   return (
     <div className="space-y-6">
       <div>
@@ -295,7 +308,7 @@ export const TimeTracker = () => {
                   </SelectTrigger>
                   <SelectContent>
                     {projects.map((project) => (
-                      <SelectItem key={project.id} value={project.id.toString()}>
+                      <SelectItem key={`project-select-${project.id}`} value={project.id.toString()}>
                         {project.name} ({project.lifeArea})
                       </SelectItem>
                     ))}
@@ -303,17 +316,17 @@ export const TimeTracker = () => {
                 </Select>
               </div>
 
-              {selectedProjectData && availableTasks.length > 0 && (
+              {selectedProjectData && (
                 <div>
                   <label className="block text-sm font-medium mb-2">Task</label>
                   <Select value={selectedTask} onValueChange={setSelectedTask}>
                     <SelectTrigger>
-                      <SelectValue placeholder="Select a task..." />
+                      <SelectValue placeholder="Select a task (optional)..." />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="">General project work</SelectItem>
                       {availableTasks.map((task) => (
-                        <SelectItem key={task.id} value={task.id.toString()}>
+                        <SelectItem key={`task-select-${task.id}`} value={task.id.toString()}>
                           {task.name}
                         </SelectItem>
                       ))}
@@ -376,7 +389,7 @@ export const TimeTracker = () => {
                 <p className="text-slate-500 text-center py-4">No sessions logged today</p>
               ) : (
                 recentLogs.map((log, index) => (
-                  <div key={index} className="flex justify-between items-center p-3 bg-slate-50 rounded-lg">
+                  <div key={`log-${index}-${log.timestamp}`} className="flex justify-between items-center p-3 bg-slate-50 rounded-lg">
                     <div>
                       <div className="font-medium">{log.project}</div>
                       {log.task && <div className="text-sm text-slate-600">{log.task}</div>}
@@ -410,7 +423,7 @@ export const TimeTracker = () => {
               const totalSpent = project.tasks?.reduce((sum, task) => sum + (task.spentHours || 0), 0) || 0;
               
               return (
-                <div key={project.id} className="p-4 border border-slate-200 rounded-lg">
+                <div key={`summary-${project.id}`} className="p-4 border border-slate-200 rounded-lg">
                   <div className="font-medium mb-2">{project.name}</div>
                   <div className="text-sm text-slate-500 mb-3">{project.lifeArea}</div>
                   <div className="space-y-1">

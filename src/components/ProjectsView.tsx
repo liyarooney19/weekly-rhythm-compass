@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -59,16 +58,30 @@ export const ProjectsView = () => {
     const savedStrategy = localStorage.getItem('strategySession');
     const savedProjects = localStorage.getItem('projects');
     let allProjects: Project[] = [];
+    const projectNames = new Set<string>(); // Track unique project names
     
-    // Load from strategy session
+    // Load from saved projects first
+    if (savedProjects) {
+      try {
+        const projects = JSON.parse(savedProjects);
+        allProjects = [...projects];
+        // Track existing project names
+        projects.forEach((p: Project) => projectNames.add(p.name.toLowerCase().trim()));
+      } catch (error) {
+        console.error('Error loading saved projects:', error);
+      }
+    }
+
+    // Load from strategy session only if not already exists
     if (savedStrategy) {
       try {
         const data = JSON.parse(savedStrategy);
         if (data.projects) {
           const strategyProjects = data.projects
             .filter((p: any) => p.name.trim() !== '')
+            .filter((p: any) => !projectNames.has(p.name.toLowerCase().trim())) // Avoid duplicates
             .map((p: any, index: number) => ({
-              id: index + 100,
+              id: Date.now() + index, // Use timestamp for unique IDs
               name: p.name,
               lifeArea: p.lifeArea,
               description: p.description || '',
@@ -83,16 +96,6 @@ export const ProjectsView = () => {
         }
       } catch (error) {
         console.error('Error loading strategy projects:', error);
-      }
-    }
-
-    // Load from saved projects
-    if (savedProjects) {
-      try {
-        const projects = JSON.parse(savedProjects);
-        allProjects = [...allProjects, ...projects];
-      } catch (error) {
-        console.error('Error loading saved projects:', error);
       }
     }
 
@@ -346,7 +349,7 @@ export const ProjectsView = () => {
             const totals = calculateProjectTotals(project);
             return (
               <Card 
-                key={project.id} 
+                key={`project-${project.id}`}
                 className="cursor-pointer hover:shadow-md transition-shadow"
                 onClick={() => setSelectedProject(project.id)}
               >
@@ -474,7 +477,7 @@ export const ProjectsView = () => {
                   {/* Tasks List */}
                   <div className="space-y-3">
                     {project.tasks.map((task) => (
-                      <div key={task.id} className="flex items-center justify-between p-3 border border-slate-200 rounded-lg">
+                      <div key={`task-${task.id}`} className="flex items-center justify-between p-3 border border-slate-200 rounded-lg">
                         <div className="flex items-center gap-3">
                           <button 
                             onClick={() => toggleTaskComplete(project.id, task.id)}
