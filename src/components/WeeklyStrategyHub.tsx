@@ -384,7 +384,7 @@ export const WeeklyStrategyHub = () => {
               )}
             </div>
           </CardContent>
-        </div>
+        </Card>
       )}
     </div>
   );
