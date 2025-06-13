@@ -97,7 +97,9 @@ export const TimeTracker = () => {
               id: Date.now() + index,
               name: p.name,
               lifeArea: p.lifeArea,
-              tasks: []
+              tasks: [],
+              investedHours: 0,
+              spentHours: 0
             }));
           allProjects = [...allProjects, ...strategyProjects];
         }
@@ -456,6 +458,8 @@ export const TimeTracker = () => {
               const projectSpent = project.spentHours || 0;
               const totalInvested = taskInvested + projectInvested;
               const totalSpent = taskSpent + projectSpent;
+              
+              console.log(`Project ${project.name}: taskInvested=${taskInvested}, projectInvested=${projectInvested}, totalInvested=${totalInvested}`);
               
               return (
                 <div key={`summary-${project.id}`} className="p-4 border border-slate-200 rounded-lg">

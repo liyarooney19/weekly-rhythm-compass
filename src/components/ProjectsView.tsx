@@ -1,24 +1,25 @@
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Progress } from '@/components/ui/progress';
 import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { FolderOpen, Plus, Clock, Target, CheckCircle, Edit2, Trash2 } from 'lucide-react';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Plus, Trash2, Timer } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 interface Project {
   id: number;
   name: string;
-  lifeArea: string;
   description: string;
-  status: string;
+  lifeArea: string;
+  status: 'planning' | 'active' | 'completed';
   progress: number;
   totalHours: number;
-  investedHours: number;
-  spentHours: number;
+  investedHours?: number;
+  spentHours?: number;
   tasks: Task[];
 }
 
@@ -32,25 +33,21 @@ interface Task {
 }
 
 export const ProjectsView = () => {
-  const [selectedProject, setSelectedProject] = useState<number | null>(null);
   const [projects, setProjects] = useState<Project[]>([]);
-  const [showNewProject, setShowNewProject] = useState(false);
-  const [newProjectName, setNewProjectName] = useState('');
-  const [newProjectDescription, setNewProjectDescription] = useState('');
-  const [newProjectLifeArea, setNewProjectLifeArea] = useState('');
-  const [newTaskName, setNewTaskName] = useState('');
-  const [newTaskHours, setNewTaskHours] = useState('');
+  const [newProject, setNewProject] = useState({
+    name: '',
+    description: '',
+    lifeArea: 'Personal Growth'
+  });
+  const [newTask, setNewTask] = useState({
+    name: '',
+    estimatedHours: ''
+  });
+  const [newProjectDialog, setNewProjectDialog] = useState(false);
   const { toast } = useToast();
 
-  const lifeAreaOptions = [
-    'Work / Career',
-    'Creative Projects', 
-    'Health & Routines',
-    'Relationships / Family',
-    'Leisure/Hobby'
-  ];
+  const lifeAreas = ['Personal Growth', 'Career', 'Finance', 'Health', 'Relationships', 'Leisure'];
 
-  // Load projects from strategy session and localStorage
   useEffect(() => {
     loadProjects();
   }, []);
@@ -59,34 +56,33 @@ export const ProjectsView = () => {
     const savedStrategy = localStorage.getItem('strategySession');
     const savedProjects = localStorage.getItem('projects');
     let allProjects: Project[] = [];
-    const projectNames = new Set<string>(); // Track unique project names
     
-    // Load from saved projects first
+    // Load from saved projects first (these have tasks and time data)
     if (savedProjects) {
       try {
         const projects = JSON.parse(savedProjects);
         allProjects = [...projects];
-        // Track existing project names
-        projects.forEach((p: Project) => projectNames.add(p.name.toLowerCase().trim()));
+        console.log('Loaded saved projects:', projects);
       } catch (error) {
         console.error('Error loading saved projects:', error);
       }
     }
 
-    // Load from strategy session only if not already exists
+    // Load from strategy session (these typically don't have tasks yet)
     if (savedStrategy) {
       try {
         const data = JSON.parse(savedStrategy);
         if (data.projects) {
+          const existingNames = new Set(allProjects.map(p => p.name.toLowerCase().trim()));
           const strategyProjects = data.projects
             .filter((p: any) => p.name.trim() !== '')
-            .filter((p: any) => !projectNames.has(p.name.toLowerCase().trim())) // Avoid duplicates
+            .filter((p: any) => !existingNames.has(p.name.toLowerCase().trim()))
             .map((p: any, index: number) => ({
-              id: Date.now() + index, // Use timestamp for unique IDs
+              id: Date.now() + index,
               name: p.name,
-              lifeArea: p.lifeArea,
               description: p.description || '',
-              status: 'active',
+              lifeArea: p.lifeArea,
+              status: 'planning' as const,
               progress: 0,
               totalHours: 0,
               investedHours: 0,
@@ -100,53 +96,30 @@ export const ProjectsView = () => {
       }
     }
 
-    // Mock projects if no saved projects
-    if (allProjects.length === 0) {
-      allProjects = [
-        {
-          id: 1,
-          name: 'Fitness App',
-          lifeArea: 'Health & Routines',
-          description: 'Build a comprehensive fitness tracking app that monitors energy levels throughout the day',
-          status: 'active',
-          progress: 65,
-          totalHours: 42.5,
-          investedHours: 38.2,
-          spentHours: 4.3,
-          tasks: [
-            { id: 1, name: 'User interface design', completed: true, estimatedHours: 8, investedHours: 8, spentHours: 0 },
-            { id: 2, name: 'Backend API development', completed: true, estimatedHours: 12, investedHours: 12, spentHours: 0 },
-            { id: 3, name: 'Energy tracking algorithm', completed: false, estimatedHours: 6, investedHours: 3, spentHours: 1 },
-            { id: 4, name: 'Mobile app testing', completed: false, estimatedHours: 4, investedHours: 0, spentHours: 0 },
-          ]
-        }
-      ];
-    }
-
     setProjects(allProjects);
   };
 
   const saveProjects = (updatedProjects: Project[]) => {
-    localStorage.setItem('projects', JSON.stringify(updatedProjects));
     setProjects(updatedProjects);
+    localStorage.setItem('projects', JSON.stringify(updatedProjects));
   };
 
-  const createNewProject = () => {
-    if (!newProjectName.trim() || !newProjectLifeArea) {
+  const addProject = () => {
+    if (!newProject.name.trim()) {
       toast({
         title: "Error",
-        description: "Please fill in project name and life area",
+        description: "Please enter a project name",
         variant: "destructive"
       });
       return;
     }
 
-    const newProject: Project = {
+    const project: Project = {
       id: Date.now(),
-      name: newProjectName,
-      lifeArea: newProjectLifeArea,
-      description: newProjectDescription,
-      status: 'active',
+      name: newProject.name.trim(),
+      description: newProject.description.trim(),
+      lifeArea: newProject.lifeArea,
+      status: 'planning',
       progress: 0,
       totalHours: 0,
       investedHours: 0,
@@ -154,491 +127,421 @@ export const ProjectsView = () => {
       tasks: []
     };
 
-    const updatedProjects = [...projects, newProject];
+    const updatedProjects = [...projects, project];
     saveProjects(updatedProjects);
-    
-    setNewProjectName('');
-    setNewProjectDescription('');
-    setNewProjectLifeArea('');
-    setShowNewProject(false);
-    
+
+    setNewProject({
+      name: '',
+      description: '',
+      lifeArea: 'Personal Growth'
+    });
+    setNewProjectDialog(false);
+
     toast({
-      title: "Success",
-      description: "Project created successfully"
+      title: "Project Added",
+      description: `${project.name} has been added to your projects`
+    });
+  };
+
+  const deleteProject = (projectId: number) => {
+    const updatedProjects = projects.filter(project => project.id !== projectId);
+    saveProjects(updatedProjects);
+
+    toast({
+      title: "Project Deleted",
+      description: "Project has been deleted"
     });
   };
 
   const addTask = (projectId: number) => {
-    if (!newTaskName.trim()) {
+    if (!newTask.name.trim() || !newTask.estimatedHours.trim()) {
       toast({
         title: "Error",
-        description: "Please enter a task name",
+        description: "Please enter task name and estimated hours",
         variant: "destructive"
       });
       return;
     }
 
-    const updatedProjects = projects.map(project => {
-      if (project.id === projectId) {
-        const newTask: Task = {
-          id: Date.now(),
-          name: newTaskName,
-          completed: false,
-          estimatedHours: parseFloat(newTaskHours) || 0,
-          investedHours: 0,
-          spentHours: 0
-        };
-        return {
-          ...project,
-          tasks: [...project.tasks, newTask]
-        };
-      }
-      return project;
-    });
-
-    saveProjects(updatedProjects);
-    setNewTaskName('');
-    setNewTaskHours('');
-    
-    toast({
-      title: "Success",
-      description: "Task added successfully"
-    });
-  };
-
-  const deleteProject = (projectId: number, projectName: string) => {
-    const updatedProjects = projects.filter(project => project.id !== projectId);
-    saveProjects(updatedProjects);
-    
-    // If this was the selected project, clear the selection
-    if (selectedProject === projectId) {
-      setSelectedProject(null);
+    const estimatedHours = parseFloat(newTask.estimatedHours);
+    if (isNaN(estimatedHours) || estimatedHours <= 0) {
+      toast({
+        title: "Error",
+        description: "Please enter a valid estimated hours",
+        variant: "destructive"
+      });
+      return;
     }
-    
-    toast({
-      title: "Project Deleted",
-      description: `"${projectName}" has been deleted successfully`
-    });
-  };
 
-  const deleteTask = (projectId: number, taskId: number, taskName: string) => {
+    const task: Task = {
+      id: Date.now(),
+      name: newTask.name.trim(),
+      completed: false,
+      estimatedHours: estimatedHours,
+      investedHours: 0,
+      spentHours: 0
+    };
+
     const updatedProjects = projects.map(project => {
       if (project.id === projectId) {
-        const updatedTasks = project.tasks.filter(task => task.id !== taskId);
-        const completedTasks = updatedTasks.filter(t => t.completed).length;
-        const progress = updatedTasks.length > 0 ? Math.round((completedTasks / updatedTasks.length) * 100) : 0;
-        
         return {
           ...project,
-          tasks: updatedTasks,
-          progress
+          tasks: [...project.tasks, task]
         };
       }
       return project;
     });
-
     saveProjects(updatedProjects);
-    
+
+    setNewTask({
+      name: '',
+      estimatedHours: ''
+    });
+
+    toast({
+      title: "Task Added",
+      description: `${task.name} has been added to ${updatedProjects.find(p => p.id === projectId)?.name}`
+    });
+  };
+
+  const deleteTask = (projectId: number, taskId: number) => {
+    const updatedProjects = projects.map(project => {
+      if (project.id === projectId) {
+        return {
+          ...project,
+          tasks: project.tasks.filter(task => task.id !== taskId)
+        };
+      }
+      return project;
+    });
+    saveProjects(updatedProjects);
+
     toast({
       title: "Task Deleted",
-      description: `"${taskName}" has been deleted successfully`
+      description: "Task has been deleted"
     });
   };
 
-  const toggleTaskComplete = (projectId: number, taskId: number) => {
+  const toggleTask = (projectId: number, taskId: number) => {
     const updatedProjects = projects.map(project => {
       if (project.id === projectId) {
         const updatedTasks = project.tasks.map(task => {
           if (task.id === taskId) {
-            return { ...task, completed: !task.completed };
+            return {
+              ...task,
+              completed: !task.completed
+            };
           }
           return task;
         });
-        
-        const completedTasks = updatedTasks.filter(t => t.completed).length;
-        const progress = updatedTasks.length > 0 ? Math.round((completedTasks / updatedTasks.length) * 100) : 0;
-        
         return {
           ...project,
-          tasks: updatedTasks,
-          progress
+          tasks: updatedTasks
         };
       }
       return project;
     });
-
     saveProjects(updatedProjects);
   };
 
-  const startTimerForTask = (projectId: number, taskId: number, taskName: string) => {
-    // Store the current task info for the timer
+  const startTaskTimer = (projectId: number, taskId: number, taskName: string) => {
+    // Store the task details in localStorage
     localStorage.setItem('currentTimerTask', JSON.stringify({
-      projectId,
-      taskId,
-      taskName,
-      projectName: projects.find(p => p.id === projectId)?.name
+      projectId: projectId,
+      taskId: taskId,
+      taskName: taskName
     }));
-    
-    toast({
-      title: "Timer Ready",
-      description: `Navigate to Time Tracker to start timing "${taskName}"`
-    });
+
+    // Redirect to the TimeTracker page
+    window.location.href = '/time-tracker';
   };
 
   const getLifeAreaColor = (lifeArea: string) => {
     const colors = {
-      'Work / Career': 'bg-blue-100 text-blue-800',
-      'Creative Projects': 'bg-purple-100 text-purple-800',
-      'Health & Routines': 'bg-red-100 text-red-800',
-      'Relationships / Family': 'bg-pink-100 text-pink-800',
-      'Leisure/Hobby': 'bg-green-100 text-green-800'
+      'Personal Growth': 'bg-blue-100 text-blue-800',
+      'Career': 'bg-purple-100 text-purple-800',
+      'Finance': 'bg-green-100 text-green-800',
+      'Health': 'bg-red-100 text-red-800',
+      'Relationships': 'bg-pink-100 text-pink-800',
+      'Leisure': 'bg-orange-100 text-orange-800'
     };
     return colors[lifeArea as keyof typeof colors] || 'bg-slate-100 text-slate-800';
   };
 
-  const calculateProjectTotals = (project: Project) => {
-    // Calculate totals from tasks
-    const taskInvested = project.tasks.reduce((sum, task) => sum + (task.investedHours || 0), 0);
-    const taskSpent = project.tasks.reduce((sum, task) => sum + (task.spentHours || 0), 0);
-    
-    // Add direct project time (for general project work)
-    const projectInvested = project.investedHours || 0;
-    const projectSpent = project.spentHours || 0;
-    
-    const totalInvested = taskInvested + projectInvested;
-    const totalSpent = taskSpent + projectSpent;
-    
-    return {
-      totalInvested,
-      totalSpent,
-      totalHours: totalInvested + totalSpent
-    };
+  const calculateTotalHours = (tasks: Task[], type: 'invested' | 'spent') => {
+    return tasks.reduce((sum, task) => sum + (task[type === 'invested' ? 'investedHours' : 'spentHours'] || 0), 0);
   };
-
-  if (showNewProject) {
-    return (
-      <div className="space-y-6">
-        <div className="flex items-center gap-4">
-          <Button variant="outline" onClick={() => setShowNewProject(false)}>
-            ← Back to Projects
-          </Button>
-          <h1 className="text-3xl font-bold text-slate-800">Create New Project</h1>
-        </div>
-
-        <Card className="max-w-2xl">
-          <CardHeader>
-            <CardTitle>Project Details</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium mb-2">Project Name</label>
-              <Input 
-                value={newProjectName}
-                onChange={(e) => setNewProjectName(e.target.value)}
-                placeholder="Enter project name..."
-              />
-            </div>
-            
-            <div>
-              <label className="block text-sm font-medium mb-2">Life Area</label>
-              <Select value={newProjectLifeArea} onValueChange={setNewProjectLifeArea}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select life area..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {lifeAreaOptions.map((area) => (
-                    <SelectItem key={area} value={area}>
-                      {area}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium mb-2">Description (Optional)</label>
-              <Input 
-                value={newProjectDescription}
-                onChange={(e) => setNewProjectDescription(e.target.value)}
-                placeholder="Enter project description..."
-              />
-            </div>
-
-            <div className="flex gap-2">
-              <Button onClick={createNewProject} className="flex-1">
-                Create Project
-              </Button>
-              <Button variant="outline" onClick={() => setShowNewProject(false)}>
-                Cancel
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
 
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-3xl font-bold text-slate-800 mb-2">Projects</h1>
-          <p className="text-slate-600">Manage your strategic projects and track progress</p>
+          <h1 className="text-3xl font-bold text-slate-800 mb-2">Projects Overview</h1>
+          <p className="text-slate-600">Manage your projects and track time investment</p>
         </div>
-        <Button onClick={() => setShowNewProject(true)} className="flex items-center gap-2">
-          <Plus className="h-4 w-4" />
-          New Project
-        </Button>
+        <Dialog open={newProjectDialog} onOpenChange={setNewProjectDialog}>
+          <DialogTrigger asChild>
+            <Button>
+              <Plus className="h-4 w-4 mr-2" />
+              Add Project
+            </Button>
+          </DialogTrigger>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Add New Project</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4">
+              <Input
+                placeholder="Project name..."
+                value={newProject.name}
+                onChange={(e) => setNewProject({...newProject, name: e.target.value})}
+              />
+              <Textarea
+                placeholder="Project description..."
+                value={newProject.description}
+                onChange={(e) => setNewProject({...newProject, description: e.target.value})}
+              />
+              <Select value={newProject.lifeArea} onValueChange={(value) => setNewProject({...newProject, lifeArea: value})}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select life area..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {lifeAreas.map(area => (
+                    <SelectItem key={area} value={area}>{area}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <div className="flex gap-2">
+                <Button onClick={addProject} disabled={!newProject.name.trim()}>
+                  Add Project
+                </Button>
+                <Button variant="outline" onClick={() => setNewProjectDialog(false)}>
+                  Cancel
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
       </div>
 
-      {selectedProject === null ? (
-        /* Projects Grid */
-        <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
-          {projects.map((project) => {
-            const totals = calculateProjectTotals(project);
-            return (
-              <Card 
-                key={`project-${project.id}`}
-                className="cursor-pointer hover:shadow-md transition-shadow"
-              >
-                <CardHeader className="pb-3">
-                  <div className="flex justify-between items-start">
-                    <CardTitle 
-                      className="text-lg cursor-pointer"
-                      onClick={() => setSelectedProject(project.id)}
-                    >
-                      {project.name}
-                    </CardTitle>
-                    <div className="flex items-center gap-2">
-                      <Badge className={getLifeAreaColor(project.lifeArea)}>
-                        {project.lifeArea}
-                      </Badge>
-                      <Dialog>
-                        <DialogTrigger asChild>
-                          <Button size="sm" variant="outline" className="h-6 w-6 p-0">
-                            <Trash2 className="h-3 w-3" />
-                          </Button>
-                        </DialogTrigger>
-                        <DialogContent>
-                          <DialogHeader>
-                            <DialogTitle>Delete Project</DialogTitle>
-                            <DialogDescription>
-                              Are you sure you want to delete "{project.name}"? This action cannot be undone.
-                            </DialogDescription>
-                          </DialogHeader>
-                          <DialogFooter>
-                            <Button variant="outline">Cancel</Button>
-                            <Button 
-                              variant="destructive" 
-                              onClick={() => deleteProject(project.id, project.name)}
-                            >
-                              Delete Project
-                            </Button>
-                          </DialogFooter>
-                        </DialogContent>
-                      </Dialog>
-                    </div>
-                  </div>
-                  <p className="text-sm text-slate-600">{project.description}</p>
-                </CardHeader>
-                <CardContent className="space-y-4" onClick={() => setSelectedProject(project.id)}>
-                  <div className="space-y-2">
-                    <div className="flex justify-between text-sm">
-                      <span>Progress</span>
-                      <span>{project.progress}%</span>
-                    </div>
-                    <Progress value={project.progress} className="h-2" />
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-4 text-sm">
-                    <div>
-                      <div className="text-slate-500">Total Hours</div>
-                      <div className="font-semibold">{totals.totalHours.toFixed(1)}h</div>
-                    </div>
-                    <div>
-                      <div className="text-slate-500">Invested</div>
-                      <div className="font-semibold text-green-600">{totals.totalInvested.toFixed(1)}h</div>
-                    </div>
-                  </div>
-
-                  <div className="flex justify-between items-center text-xs text-slate-500">
-                    <span>{project.tasks.filter(t => t.completed).length}/{project.tasks.length} tasks done</span>
-                    <span>Click to view details</span>
-                  </div>
-                </CardContent>
-              </Card>
-            );
-          })}
-        </div>
-      ) : (
-        /* Project Detail View */
-        (() => {
-          const project = projects.find(p => p.id === selectedProject)!;
-          const totals = calculateProjectTotals(project);
+      {/* Projects Grid */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {projects.map((project) => {
+          const taskInvested = calculateTotalHours(project.tasks, 'invested');
+          const taskSpent = calculateTotalHours(project.tasks, 'spent');
+          const projectInvested = project.investedHours || 0;
+          const projectSpent = project.spentHours || 0;
+          const totalInvested = taskInvested + projectInvested;
+          const totalSpent = taskSpent + projectSpent;
           
+          console.log(`ProjectsView - ${project.name}: taskInvested=${taskInvested}, projectInvested=${projectInvested}, totalInvested=${totalInvested}`);
+
           return (
-            <div className="space-y-6">
-              <div className="flex items-center gap-4">
-                <Button 
-                  variant="outline" 
-                  onClick={() => setSelectedProject(null)}
-                >
-                  ← Back to Projects
-                </Button>
-                <Badge className={getLifeAreaColor(project.lifeArea)}>
-                  {project.lifeArea}
-                </Badge>
-                <Dialog>
-                  <DialogTrigger asChild>
-                    <Button variant="outline" size="sm">
-                      <Trash2 className="h-4 w-4 mr-2" />
-                      Delete Project
-                    </Button>
-                  </DialogTrigger>
-                  <DialogContent>
-                    <DialogHeader>
-                      <DialogTitle>Delete Project</DialogTitle>
-                      <DialogDescription>
-                        Are you sure you want to delete "{project.name}"? This action cannot be undone and will remove all tasks and time logs.
-                      </DialogDescription>
-                    </DialogHeader>
-                    <DialogFooter>
-                      <Button variant="outline">Cancel</Button>
-                      <Button 
-                        variant="destructive" 
-                        onClick={() => deleteProject(project.id, project.name)}
-                      >
-                        Delete Project
-                      </Button>
-                    </DialogFooter>
-                  </DialogContent>
-                </Dialog>
-              </div>
-
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-2xl">{project.name}</CardTitle>
-                  <p className="text-slate-600">{project.description}</p>
-                </CardHeader>
-                <CardContent className="space-y-6">
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                    <div className="text-center p-4 border border-slate-200 rounded-lg">
-                      <div className="text-2xl font-bold text-blue-600">{totals.totalHours.toFixed(1)}h</div>
-                      <div className="text-sm text-slate-600">Total Time</div>
-                    </div>
-                    <div className="text-center p-4 border border-slate-200 rounded-lg">
-                      <div className="text-2xl font-bold text-green-600">{totals.totalInvested.toFixed(1)}h</div>
-                      <div className="text-sm text-slate-600">Invested</div>
-                    </div>
-                    <div className="text-center p-4 border border-slate-200 rounded-lg">
-                      <div className="text-2xl font-bold text-amber-600">{totals.totalSpent.toFixed(1)}h</div>
-                      <div className="text-sm text-slate-600">Spent</div>
-                    </div>
+            <Card key={project.id}>
+              <CardHeader className="pb-3">
+                <div className="flex justify-between items-start">
+                  <div className="flex-1">
+                    <CardTitle className="text-lg">{project.name}</CardTitle>
+                    <Badge className={getLifeAreaColor(project.lifeArea)} variant="outline">
+                      {project.lifeArea}
+                    </Badge>
                   </div>
-
-                  <div className="space-y-2">
-                    <div className="flex justify-between text-sm">
-                      <span>Overall Progress</span>
-                      <span>{project.progress}%</span>
-                    </div>
-                    <Progress value={project.progress} className="h-3" />
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <CheckCircle className="h-5 w-5" />
-                    Project Tasks
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  {/* Add New Task */}
-                  <div className="bg-slate-50 p-4 rounded-lg mb-4">
-                    <h4 className="font-medium mb-3">Add New Task</h4>
-                    <div className="flex gap-2">
-                      <Input 
-                        placeholder="Task name..."
-                        value={newTaskName}
-                        onChange={(e) => setNewTaskName(e.target.value)}
-                        className="flex-1"
-                      />
-                      <Input 
-                        placeholder="Est. hours"
-                        type="number"
-                        value={newTaskHours}
-                        onChange={(e) => setNewTaskHours(e.target.value)}
-                        className="w-24"
-                      />
-                      <Button onClick={() => addTask(project.id)}>
-                        <Plus className="h-4 w-4 mr-1" />
-                        Add
-                      </Button>
-                    </div>
-                  </div>
-
-                  {/* Tasks List */}
-                  <div className="space-y-3">
-                    {project.tasks.map((task) => (
-                      <div key={`task-${task.id}`} className="flex items-center justify-between p-3 border border-slate-200 rounded-lg">
-                        <div className="flex items-center gap-3">
-                          <button 
-                            onClick={() => toggleTaskComplete(project.id, task.id)}
-                            className={`w-4 h-4 rounded-full ${task.completed ? 'bg-green-500' : 'bg-slate-300'}`}
-                          ></button>
-                          <span className={task.completed ? 'line-through text-slate-500' : 'text-slate-800'}>
-                            {task.name}
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-4 text-sm">
-                          <span className="text-slate-500">
-                            Est: {task.estimatedHours}h | 
-                            Inv: {task.investedHours.toFixed(1)}h | 
-                            Spent: {task.spentHours.toFixed(1)}h
-                          </span>
+                  <div className="flex gap-2">
+                    <Dialog>
+                      <DialogTrigger asChild>
+                        <Button size="sm" variant="outline">
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </DialogTrigger>
+                      <DialogContent>
+                        <DialogHeader>
+                          <DialogTitle>Delete Project</DialogTitle>
+                        </DialogHeader>
+                        <p>Are you sure you want to delete "{project.name}"? This action cannot be undone.</p>
+                        <div className="flex gap-2 mt-4">
                           <Button 
-                            size="sm" 
-                            variant="outline"
-                            onClick={() => startTimerForTask(project.id, task.id, task.name)}
+                            variant="destructive" 
+                            onClick={() => deleteProject(project.id)}
                           >
-                            <Clock className="h-4 w-4 mr-1" />
-                            Start Timer
+                            Delete
                           </Button>
-                          <Dialog>
-                            <DialogTrigger asChild>
-                              <Button size="sm" variant="outline">
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
-                            </DialogTrigger>
-                            <DialogContent>
-                              <DialogHeader>
-                                <DialogTitle>Delete Task</DialogTitle>
-                                <DialogDescription>
-                                  Are you sure you want to delete "{task.name}"? This action cannot be undone.
-                                </DialogDescription>
-                              </DialogHeader>
-                              <DialogFooter>
-                                <Button variant="outline">Cancel</Button>
-                                <Button 
-                                  variant="destructive" 
-                                  onClick={() => deleteTask(project.id, task.id, task.name)}
-                                >
-                                  Delete Task
-                                </Button>
-                              </DialogFooter>
-                            </DialogContent>
-                          </Dialog>
+                          <Button variant="outline">Cancel</Button>
                         </div>
-                      </div>
-                    ))}
+                      </DialogContent>
+                    </Dialog>
                   </div>
-                </CardContent>
-              </Card>
-            </div>
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {project.description && (
+                  <p className="text-sm text-slate-600">{project.description}</p>
+                )}
+                
+                <div className="grid grid-cols-2 gap-4 text-sm">
+                  <div className="space-y-1">
+                    <div className="flex justify-between">
+                      <span>Invested:</span>
+                      <span className="font-mono text-green-600">{totalInvested.toFixed(1)}h</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Spent:</span>
+                      <span className="font-mono text-amber-600">{totalSpent.toFixed(1)}h</span>
+                    </div>
+                  </div>
+                  <div className="space-y-1">
+                    <div className="flex justify-between">
+                      <span>Tasks:</span>
+                      <span>{project.tasks.length}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Status:</span>
+                      <Badge variant={project.status === 'active' ? 'default' : 'secondary'}>
+                        {project.status}
+                      </Badge>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Tasks */}
+                <div className="space-y-2">
+                  <div className="flex justify-between items-center">
+                    <h4 className="font-medium">Tasks</h4>
+                    <Dialog>
+                      <DialogTrigger asChild>
+                        <Button size="sm" variant="outline">
+                          <Plus className="h-3 w-3 mr-1" />
+                          Add Task
+                        </Button>
+                      </DialogTrigger>
+                      <DialogContent>
+                        <DialogHeader>
+                          <DialogTitle>Add Task to {project.name}</DialogTitle>
+                        </DialogHeader>
+                        <div className="space-y-4">
+                          <Input
+                            placeholder="Task name..."
+                            value={newTask.name}
+                            onChange={(e) => setNewTask({...newTask, name: e.target.value})}
+                          />
+                          <Input
+                            type="number"
+                            placeholder="Estimated hours..."
+                            value={newTask.estimatedHours}
+                            onChange={(e) => setNewTask({...newTask, estimatedHours: e.target.value})}
+                            min="0"
+                            step="0.5"
+                          />
+                          <div className="flex gap-2">
+                            <Button onClick={() => addTask(project.id)} disabled={!newTask.name.trim()}>
+                              Add Task
+                            </Button>
+                            <Button variant="outline">Cancel</Button>
+                          </div>
+                        </div>
+                      </DialogContent>
+                    </Dialog>
+                  </div>
+
+                  {project.tasks.length === 0 ? (
+                    <p className="text-sm text-slate-500 italic">No tasks yet</p>
+                  ) : (
+                    <div className="space-y-2">
+                      {project.tasks.map((task) => (
+                        <div key={task.id} className="flex items-center justify-between p-2 bg-slate-50 rounded">
+                          <div className="flex items-center gap-2 flex-1">
+                            <Checkbox
+                              checked={task.completed}
+                              onCheckedChange={(checked) => toggleTask(project.id, task.id)}
+                            />
+                            <span className={`text-sm ${task.completed ? 'line-through text-slate-500' : ''}`}>
+                              {task.name}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <div className="text-xs text-slate-500">
+                              {task.investedHours.toFixed(1)}h / {task.estimatedHours}h
+                            </div>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => startTaskTimer(project.id, task.id, task.name)}
+                            >
+                              <Timer className="h-3 w-3" />
+                            </Button>
+                            <Dialog>
+                              <DialogTrigger asChild>
+                                <Button size="sm" variant="outline">
+                                  <Trash2 className="h-3 w-3" />
+                                </Button>
+                              </DialogTrigger>
+                              <DialogContent>
+                                <DialogHeader>
+                                  <DialogTitle>Delete Task</DialogTitle>
+                                </DialogHeader>
+                                <p>Are you sure you want to delete "{task.name}"? This action cannot be undone.</p>
+                                <div className="flex gap-2 mt-4">
+                                  <Button 
+                                    variant="destructive" 
+                                    onClick={() => deleteTask(project.id, task.id)}
+                                  >
+                                    Delete
+                                  </Button>
+                                  <Button variant="outline">Cancel</Button>
+                                </div>
+                              </DialogContent>
+                            </Dialog>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
           );
-        })()
-      )}
+        })}
+      </div>
+
+      {/* Project Summary */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Project Summary</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div className="text-center p-4 border border-slate-200 rounded-lg">
+              <div className="text-2xl font-bold text-blue-600">{projects.length}</div>
+              <div className="text-sm text-slate-600">Total Projects</div>
+            </div>
+            <div className="text-center p-4 border border-slate-200 rounded-lg">
+              <div className="text-2xl font-bold text-green-600">
+                {projects.reduce((sum, p) => {
+                  const taskInvested = calculateTotalHours(p.tasks, 'invested');
+                  const projectInvested = p.investedHours || 0;
+                  return sum + taskInvested + projectInvested;
+                }, 0).toFixed(1)}h
+              </div>
+              <div className="text-sm text-slate-600">Invested Hours</div>
+            </div>
+            <div className="text-center p-4 border border-slate-200 rounded-lg">
+              <div className="text-2xl font-bold text-amber-600">
+                {projects.reduce((sum, p) => {
+                  const taskSpent = calculateTotalHours(p.tasks, 'spent');
+                  const projectSpent = p.spentHours || 0;
+                  return sum + taskSpent + projectSpent;
+                }, 0).toFixed(1)}h
+              </div>
+              <div className="text-sm text-slate-600">Spent Hours</div>
+            </div>
+            <div className="text-center p-4 border border-slate-200 rounded-lg">
+              <div className="text-2xl font-bold text-purple-600">
+                {projects.reduce((sum, p) => sum + p.tasks.length, 0)}
+              </div>
+              <div className="text-sm text-slate-600">Total Tasks</div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 };
