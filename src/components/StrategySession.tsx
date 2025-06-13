@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -7,7 +6,11 @@ import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Plus, ArrowRight, Target, Lightbulb, FolderOpen, Save } from 'lucide-react';
 
-export const StrategySession = () => {
+interface StrategySessionProps {
+  setActiveView?: (view: string) => void;
+}
+
+export const StrategySession: React.FC<StrategySessionProps> = ({ setActiveView }) => {
   const [activeStep, setActiveStep] = useState(0);
   const [dissatisfactions, setDissatisfactions] = useState(['']);
   const [hypotheses, setHypotheses] = useState(['']);
@@ -90,6 +93,20 @@ export const StrategySession = () => {
     localStorage.setItem('strategySession', JSON.stringify(strategyData));
     console.log('Strategy saved:', strategyData);
     alert('Strategy session saved successfully!');
+    
+    // Navigate to projects view if setActiveView is available
+    if (setActiveView) {
+      setActiveView('projects');
+    }
+  };
+
+  const handleNext = () => {
+    if (activeStep === steps.length - 1) {
+      // If on the last step (Projects), save and navigate to projects view
+      saveStrategy();
+    } else {
+      setActiveStep(Math.min(steps.length - 1, activeStep + 1));
+    }
   };
 
   // Load data on component mount
@@ -316,10 +333,10 @@ export const StrategySession = () => {
           Previous
         </Button>
         <Button
-          onClick={() => setActiveStep(Math.min(steps.length - 1, activeStep + 1))}
-          disabled={activeStep === steps.length - 1}
+          onClick={handleNext}
+          disabled={activeStep === steps.length - 1 && projects.filter(p => p.name.trim() !== '').length === 0}
         >
-          Next
+          {activeStep === steps.length - 1 ? 'Create Projects' : 'Next'}
         </Button>
       </div>
     </div>

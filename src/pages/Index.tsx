@@ -19,7 +19,7 @@ const Index = () => {
       case 'dashboard':
         return <Dashboard />;
       case 'strategy':
-        return <StrategySession />;
+        return <StrategySession setActiveView={setActiveView} />;
       case 'projects':
         return <ProjectsView />;
       case 'timer':
