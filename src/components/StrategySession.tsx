@@ -51,6 +51,16 @@ export const StrategySession = () => {
 
   const lifeAreas = ['work', 'personal', 'startup', 'health', 'relationships', 'learning'];
 
+  // Ensure hypotheses array matches dissatisfactions length
+  React.useEffect(() => {
+    if (activeStep === 1) {
+      const validDissatisfactions = dissatisfactions.filter(d => d.trim() !== '');
+      if (hypotheses.length !== validDissatisfactions.length) {
+        setHypotheses(validDissatisfactions.map((_, index) => hypotheses[index] || ''));
+      }
+    }
+  }, [activeStep, dissatisfactions]);
+
   return (
     <div className="space-y-6">
       <div>
@@ -128,20 +138,30 @@ export const StrategySession = () => {
             <p className="text-slate-600 mb-4">
               For each dissatisfaction, write a hypothesis about how you might resolve it. What actions or changes could address the issue?
             </p>
-            {hypotheses.map((hypothesis, index) => (
-              <div key={index} className="space-y-2">
-                <Textarea
-                  placeholder={`Hypothesis ${index + 1}: If I do X, then Y will improve because...`}
-                  value={hypothesis}
-                  onChange={(e) => updateHypothesis(index, e.target.value)}
-                  className="min-h-[100px]"
-                />
+            {dissatisfactions
+              .filter((dissatisfaction) => dissatisfaction.trim() !== '')
+              .map((dissatisfaction, index) => (
+                <div key={index} className="space-y-3 p-4 border border-slate-200 rounded-lg">
+                  <div className="bg-slate-50 p-3 rounded-md">
+                    <h4 className="text-sm font-medium text-slate-700 mb-1">Dissatisfaction {index + 1}:</h4>
+                    <p className="text-slate-600 text-sm">{dissatisfaction}</p>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-slate-700 mb-2 block">Your Hypothesis:</label>
+                    <Textarea
+                      placeholder={`If I do X, then this dissatisfaction will improve because...`}
+                      value={hypotheses[index] || ''}
+                      onChange={(e) => updateHypothesis(index, e.target.value)}
+                      className="min-h-[100px]"
+                    />
+                  </div>
+                </div>
+              ))}
+            {dissatisfactions.filter(d => d.trim() !== '').length === 0 && (
+              <div className="text-center py-8 text-slate-500">
+                <p>Go back to add dissatisfactions first</p>
               </div>
-            ))}
-            <Button onClick={addHypothesis} variant="outline" className="w-full">
-              <Plus className="h-4 w-4 mr-2" />
-              Add Another Hypothesis
-            </Button>
+            )}
           </CardContent>
         </Card>
       )}
