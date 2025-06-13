@@ -5,18 +5,26 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
-import { Plus, ArrowRight, Target, Lightbulb, FolderOpen } from 'lucide-react';
+import { Plus, ArrowRight, Target, Lightbulb, FolderOpen, Save } from 'lucide-react';
 
 export const StrategySession = () => {
   const [activeStep, setActiveStep] = useState(0);
   const [dissatisfactions, setDissatisfactions] = useState(['']);
   const [hypotheses, setHypotheses] = useState(['']);
-  const [projects, setProjects] = useState([{ name: '', description: '', lifeArea: 'work' }]);
+  const [projects, setProjects] = useState([{ name: '', description: '', lifeArea: 'Work / Career' }]);
 
   const steps = [
     { title: 'Current Dissatisfactions', icon: Target },
     { title: 'Hypotheses', icon: Lightbulb },
     { title: 'Projects', icon: FolderOpen },
+  ];
+
+  const lifeAreas = [
+    'Work / Career',
+    'Creative Projects', 
+    'Health & Routines',
+    'Relationships / Family',
+    'Leisure/Hobby'
   ];
 
   const addDissatisfaction = () => {
@@ -27,6 +35,18 @@ export const StrategySession = () => {
     const updated = [...dissatisfactions];
     updated[index] = value;
     setDissatisfactions(updated);
+    console.log('Updated dissatisfactions:', updated);
+  };
+
+  const removeDissatisfaction = (index: number) => {
+    if (dissatisfactions.length > 1) {
+      const updated = dissatisfactions.filter((_, i) => i !== index);
+      setDissatisfactions(updated);
+      
+      // Also remove corresponding hypothesis
+      const updatedHypotheses = hypotheses.filter((_, i) => i !== index);
+      setHypotheses(updatedHypotheses);
+    }
   };
 
   const addHypothesis = () => {
@@ -37,19 +57,62 @@ export const StrategySession = () => {
     const updated = [...hypotheses];
     updated[index] = value;
     setHypotheses(updated);
+    console.log('Updated hypotheses:', updated);
   };
 
   const addProject = () => {
-    setProjects([...projects, { name: '', description: '', lifeArea: 'work' }]);
+    setProjects([...projects, { name: '', description: '', lifeArea: 'Work / Career' }]);
   };
 
   const updateProject = (index: number, field: string, value: string) => {
     const updated = [...projects];
     updated[index] = { ...updated[index], [field]: value };
     setProjects(updated);
+    console.log('Updated projects:', updated);
   };
 
-  const lifeAreas = ['work', 'personal', 'startup', 'health', 'relationships', 'learning'];
+  const removeProject = (index: number) => {
+    if (projects.length > 1) {
+      const updated = projects.filter((_, i) => i !== index);
+      setProjects(updated);
+    }
+  };
+
+  const saveStrategy = () => {
+    const strategyData = {
+      dissatisfactions: dissatisfactions.filter(d => d.trim() !== ''),
+      hypotheses: hypotheses.filter(h => h.trim() !== ''),
+      projects: projects.filter(p => p.name.trim() !== '' || p.description.trim() !== ''),
+      timestamp: new Date().toISOString()
+    };
+    
+    // Save to localStorage for now
+    localStorage.setItem('strategySession', JSON.stringify(strategyData));
+    console.log('Strategy saved:', strategyData);
+    alert('Strategy session saved successfully!');
+  };
+
+  // Load data on component mount
+  React.useEffect(() => {
+    const savedStrategy = localStorage.getItem('strategySession');
+    if (savedStrategy) {
+      try {
+        const data = JSON.parse(savedStrategy);
+        if (data.dissatisfactions?.length > 0) {
+          setDissatisfactions(data.dissatisfactions);
+        }
+        if (data.hypotheses?.length > 0) {
+          setHypotheses(data.hypotheses);
+        }
+        if (data.projects?.length > 0) {
+          setProjects(data.projects);
+        }
+        console.log('Strategy loaded:', data);
+      } catch (error) {
+        console.error('Error loading strategy:', error);
+      }
+    }
+  }, []);
 
   // Ensure hypotheses array matches dissatisfactions length
   React.useEffect(() => {
@@ -63,9 +126,15 @@ export const StrategySession = () => {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold text-slate-800 mb-2">Strategy Session</h1>
-        <p className="text-slate-600">Transform dissatisfactions into actionable projects</p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold text-slate-800 mb-2">Strategy Session</h1>
+          <p className="text-slate-600">Transform dissatisfactions into actionable projects</p>
+        </div>
+        <Button onClick={saveStrategy} className="bg-green-600 hover:bg-green-700">
+          <Save className="h-4 w-4 mr-2" />
+          Save Strategy
+        </Button>
       </div>
 
       {/* Progress Steps */}
@@ -109,13 +178,23 @@ export const StrategySession = () => {
               What aspects of your current situation are you dissatisfied with? Be specific and honest.
             </p>
             {dissatisfactions.map((dissatisfaction, index) => (
-              <div key={index} className="space-y-2">
+              <div key={index} className="flex gap-2">
                 <Textarea
                   placeholder={`Dissatisfaction ${index + 1}...`}
                   value={dissatisfaction}
                   onChange={(e) => updateDissatisfaction(index, e.target.value)}
-                  className="min-h-[80px]"
+                  className="min-h-[80px] flex-1"
                 />
+                {dissatisfactions.length > 1 && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => removeDissatisfaction(index)}
+                    className="mt-2"
+                  >
+                    Remove
+                  </Button>
+                )}
               </div>
             ))}
             <Button onClick={addDissatisfaction} variant="outline" className="w-full">
@@ -180,21 +259,32 @@ export const StrategySession = () => {
             </p>
             {projects.map((project, index) => (
               <div key={index} className="p-4 border border-slate-200 rounded-lg space-y-4">
-                <div className="flex items-center gap-2 mb-3">
-                  <span className="font-medium text-slate-700">Project {index + 1}</span>
-                  <select
-                    value={project.lifeArea}
-                    onChange={(e) => updateProject(index, 'lifeArea', e.target.value)}
-                    className="px-2 py-1 border border-slate-300 rounded text-sm"
-                  >
-                    {lifeAreas.map((area) => (
-                      <option key={area} value={area}>
-                        {area.charAt(0).toUpperCase() + area.slice(1)}
-                      </option>
-                    ))}
-                  </select>
-                  <Badge variant="secondary">{project.lifeArea}</Badge>
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-2">
+                    <span className="font-medium text-slate-700">Project {index + 1}</span>
+                    <Badge variant="secondary">{project.lifeArea}</Badge>
+                  </div>
+                  {projects.length > 1 && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => removeProject(index)}
+                    >
+                      Remove
+                    </Button>
+                  )}
                 </div>
+                <select
+                  value={project.lifeArea}
+                  onChange={(e) => updateProject(index, 'lifeArea', e.target.value)}
+                  className="w-full px-3 py-2 border border-slate-300 rounded-md bg-white"
+                >
+                  {lifeAreas.map((area) => (
+                    <option key={area} value={area}>
+                      {area}
+                    </option>
+                  ))}
+                </select>
                 <Input
                   placeholder="Project name..."
                   value={project.name}
