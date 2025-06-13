@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -63,11 +62,21 @@ export const LeisureTracker = () => {
         setActivities(JSON.parse(savedActivities));
       } catch (error) {
         console.error('Error loading leisure activities:', error);
-        // Initialize with default activities if there's an error
-        initializeDefaultActivities();
+        setActivities([]);
       }
     } else {
-      initializeDefaultActivities();
+      // Check if this is the first time loading (no data exists)
+      // Only show default items if there's no indication of a reset
+      const hasBeenReset = localStorage.getItem('strategySession') === null && 
+                          localStorage.getItem('projects') === null;
+      
+      if (!hasBeenReset) {
+        // First time user - show default activities
+        initializeDefaultActivities();
+      } else {
+        // Data has been reset - start with empty list
+        setActivities([]);
+      }
     }
   };
 
@@ -405,52 +414,95 @@ export const LeisureTracker = () => {
       </Card>
 
       {/* Activities Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {activities.map((activity) => (
-          <Card key={activity.id}>
-            <CardHeader className="pb-3">
-              <div className="flex justify-between items-start">
-                <div>
-                  <CardTitle className="text-lg">{activity.name}</CardTitle>
-                  <div className="flex gap-2 mt-2">
-                    <Badge className={getCategoryColor(activity.category)}>
-                      {activity.category}
-                    </Badge>
-                    <Badge variant="outline">{activity.frequency}</Badge>
+      {activities.length === 0 ? (
+        <Card>
+          <CardContent className="text-center py-12">
+            <Gamepad2 className="h-16 w-16 mx-auto mb-4 text-slate-300" />
+            <h3 className="text-lg font-medium text-slate-700 mb-2">No leisure activities yet</h3>
+            <p className="text-slate-500 mb-4">Start tracking activities that bring you joy and fulfillment!</p>
+            <p className="text-sm text-slate-400">Add your first activity above to get started.</p>
+          </CardContent>
+        </Card>
+      ) : (
+        <>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {activities.map((activity) => (
+              <Card key={activity.id}>
+                <CardHeader className="pb-3">
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <CardTitle className="text-lg">{activity.name}</CardTitle>
+                      <div className="flex gap-2 mt-2">
+                        <Badge className={getCategoryColor(activity.category)}>
+                          {activity.category}
+                        </Badge>
+                        <Badge variant="outline">{activity.frequency}</Badge>
+                      </div>
+                    </div>
+                    <div className="text-right text-sm text-slate-500">
+                      <div>{activity.totalHours.toFixed(1)}h total</div>
+                      <div>{activity.lastSession}</div>
+                    </div>
                   </div>
-                </div>
-                <div className="text-right text-sm text-slate-500">
-                  <div>{activity.totalHours.toFixed(1)}h total</div>
-                  <div>{activity.lastSession}</div>
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="bg-slate-50 p-3 rounded-lg">
-                <p className="text-sm text-slate-700 italic">"{activity.intention}"</p>
-              </div>
-              
-              <div className="space-y-2">
-                <div className="flex justify-between text-sm">
-                  <span>This period progress</span>
-                  <span>{activity.completedSessions}/{activity.targetSessions} sessions</span>
-                </div>
-                <Progress 
-                  value={(activity.completedSessions / activity.targetSessions) * 100} 
-                  className="h-2" 
-                />
-              </div>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="bg-slate-50 p-3 rounded-lg">
+                    <p className="text-sm text-slate-700 italic">"{activity.intention}"</p>
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <div className="flex justify-between text-sm">
+                      <span>This period progress</span>
+                      <span>{activity.completedSessions}/{activity.targetSessions} sessions</span>
+                    </div>
+                    <Progress 
+                      value={(activity.completedSessions / activity.targetSessions) * 100} 
+                      className="h-2" 
+                    />
+                  </div>
 
-              <div className="flex gap-2">
-                <Button size="sm" className="flex-1" onClick={() => openSessionDialog(activity.id)}>
-                  <Target className="h-4 w-4 mr-1" />
-                  Log Session
-                </Button>
+                  <div className="flex gap-2">
+                    <Button size="sm" className="flex-1" onClick={() => openSessionDialog(activity.id)}>
+                      <Target className="h-4 w-4 mr-1" />
+                      Log Session
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+
+          {/* Weekly Overview */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Calendar className="h-5 w-5" />
+                This Week's Overview
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+                <div className="text-center p-4 border border-slate-200 rounded-lg">
+                  <div className="text-2xl font-bold text-blue-600">{activities.length}</div>
+                  <div className="text-sm text-slate-600">Active Activities</div>
+                </div>
+                <div className="text-center p-4 border border-slate-200 rounded-lg">
+                  <div className="text-2xl font-bold text-green-600">{getWeeklyTotal().toFixed(1)}h</div>
+                  <div className="text-sm text-slate-600">This Week</div>
+                </div>
+                <div className="text-center p-4 border border-slate-200 rounded-lg">
+                  <div className="text-2xl font-bold text-purple-600">{getCurrentWeekProgress()}%</div>
+                  <div className="text-sm text-slate-600">Goals Met</div>
+                </div>
+                <div className="text-center p-4 border border-slate-200 rounded-lg">
+                  <div className="text-2xl font-bold text-orange-600">{categories.length}</div>
+                  <div className="text-sm text-slate-600">Categories</div>
+                </div>
               </div>
             </CardContent>
           </Card>
-        ))}
-      </div>
+        </>
+      )}
 
       {/* Session Logging Dialog */}
       <Dialog open={sessionDialog.open} onOpenChange={(open) => setSessionDialog({open, activityId: null})}>
@@ -490,36 +542,6 @@ export const LeisureTracker = () => {
           </div>
         </DialogContent>
       </Dialog>
-
-      {/* Weekly Overview */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Calendar className="h-5 w-5" />
-            This Week's Overview
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
-            <div className="text-center p-4 border border-slate-200 rounded-lg">
-              <div className="text-2xl font-bold text-blue-600">{activities.length}</div>
-              <div className="text-sm text-slate-600">Active Activities</div>
-            </div>
-            <div className="text-center p-4 border border-slate-200 rounded-lg">
-              <div className="text-2xl font-bold text-green-600">{getWeeklyTotal().toFixed(1)}h</div>
-              <div className="text-sm text-slate-600">This Week</div>
-            </div>
-            <div className="text-center p-4 border border-slate-200 rounded-lg">
-              <div className="text-2xl font-bold text-purple-600">{getCurrentWeekProgress()}%</div>
-              <div className="text-sm text-slate-600">Goals Met</div>
-            </div>
-            <div className="text-center p-4 border border-slate-200 rounded-lg">
-              <div className="text-2xl font-bold text-orange-600">{categories.length}</div>
-              <div className="text-sm text-slate-600">Categories</div>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
     </div>
   );
 };

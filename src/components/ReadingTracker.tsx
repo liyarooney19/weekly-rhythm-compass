@@ -38,43 +38,54 @@ export const ReadingTracker = () => {
         setReadingItems(JSON.parse(saved));
       } catch (error) {
         console.error('Error loading reading items:', error);
+        setReadingItems([]);
       }
     } else {
-      // Default items
-      const defaultItems: ReadingItem[] = [
-        { 
-          id: 1,
-          title: 'Atomic Habits', 
-          type: 'book', 
-          category: 'productivity', 
-          progress: 65,
-          weeklyGoal: 50,
-          timeSpent: '3.2h',
-          dateAdded: new Date().toISOString()
-        },
-        { 
-          id: 2,
-          title: 'The Tim Ferriss Show', 
-          type: 'podcast', 
-          category: 'business', 
-          progress: 100,
-          weeklyGoal: 100,
-          timeSpent: '2.1h',
-          dateAdded: new Date().toISOString()
-        },
-        { 
-          id: 3,
-          title: 'React Patterns', 
-          type: 'article', 
-          category: 'technology', 
-          progress: 80,
-          weeklyGoal: 100,
-          timeSpent: '1.5h',
-          dateAdded: new Date().toISOString()
-        },
-      ];
-      setReadingItems(defaultItems);
-      localStorage.setItem('readingItems', JSON.stringify(defaultItems));
+      // Check if this is the first time loading (no data exists)
+      // Only show default items if there's no indication of a reset
+      const hasBeenReset = localStorage.getItem('strategySession') === null && 
+                          localStorage.getItem('projects') === null;
+      
+      if (!hasBeenReset) {
+        // First time user - show default items
+        const defaultItems: ReadingItem[] = [
+          { 
+            id: 1,
+            title: 'Atomic Habits', 
+            type: 'book', 
+            category: 'productivity', 
+            progress: 65,
+            weeklyGoal: 50,
+            timeSpent: '3.2h',
+            dateAdded: new Date().toISOString()
+          },
+          { 
+            id: 2,
+            title: 'The Tim Ferriss Show', 
+            type: 'podcast', 
+            category: 'business', 
+            progress: 100,
+            weeklyGoal: 100,
+            timeSpent: '2.1h',
+            dateAdded: new Date().toISOString()
+          },
+          { 
+            id: 3,
+            title: 'React Patterns', 
+            type: 'article', 
+            category: 'technology', 
+            progress: 80,
+            weeklyGoal: 100,
+            timeSpent: '1.5h',
+            dateAdded: new Date().toISOString()
+          },
+        ];
+        setReadingItems(defaultItems);
+        localStorage.setItem('readingItems', JSON.stringify(defaultItems));
+      } else {
+        // Data has been reset - start with empty list
+        setReadingItems([]);
+      }
     }
   };
 
@@ -166,7 +177,7 @@ export const ReadingTracker = () => {
         </CardContent>
       </Card>
 
-      {/* Current Reading */}
+      {/* Currently Reading */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -174,31 +185,41 @@ export const ReadingTracker = () => {
             Currently Reading
           </CardTitle>
         </CardHeader>
-        <CardContent className="space-y-4">
-          {readingItems.map((item) => (
-            <div key={item.id} className="p-4 border border-slate-200 rounded-lg space-y-3">
-              <div className="flex justify-between items-start">
-                <div>
-                  <h3 className="font-medium">{item.title}</h3>
-                  <div className="flex gap-2 mt-1">
-                    <Badge variant="outline">{item.type}</Badge>
-                    <Badge variant="secondary">{item.category}</Badge>
+        <CardContent>
+          {readingItems.length === 0 ? (
+            <div className="text-center py-8 text-slate-500">
+              <BookOpen className="h-12 w-12 mx-auto mb-4 text-slate-300" />
+              <p className="text-lg mb-2">No reading items yet</p>
+              <p className="text-sm">Add your first book, podcast, or article above to get started!</p>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {readingItems.map((item) => (
+                <div key={item.id} className="p-4 border border-slate-200 rounded-lg space-y-3">
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <h3 className="font-medium">{item.title}</h3>
+                      <div className="flex gap-2 mt-1">
+                        <Badge variant="outline">{item.type}</Badge>
+                        <Badge variant="secondary">{item.category}</Badge>
+                      </div>
+                    </div>
+                    <span className="text-sm text-slate-500">{item.timeSpent}</span>
+                  </div>
+                  <div className="space-y-1">
+                    <div className="flex justify-between text-sm">
+                      <span>Progress</span>
+                      <span>{item.progress}%</span>
+                    </div>
+                    <Progress value={item.progress} className="h-2" />
+                    <div className="text-xs text-slate-500">
+                      Weekly goal: {item.weeklyGoal}%
+                    </div>
                   </div>
                 </div>
-                <span className="text-sm text-slate-500">{item.timeSpent}</span>
-              </div>
-              <div className="space-y-1">
-                <div className="flex justify-between text-sm">
-                  <span>Progress</span>
-                  <span>{item.progress}%</span>
-                </div>
-                <Progress value={item.progress} className="h-2" />
-                <div className="text-xs text-slate-500">
-                  Weekly goal: {item.weeklyGoal}%
-                </div>
-              </div>
+              ))}
             </div>
-          ))}
+          )}
         </CardContent>
       </Card>
 
