@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -282,18 +281,56 @@ export const Dashboard = () => {
       {projects.length === 0 && readingItems.length === 0 && leisureActivities.length === 0 && (
         <Card className="border-blue-200 bg-blue-50">
           <CardHeader>
-            <CardTitle className="text-blue-800">Welcome! Let's get started</CardTitle>
+            <CardTitle className="text-blue-800 text-2xl">👋 Welcome to SelfDev OS</CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-blue-700 mb-4">
-              Your dashboard is empty because you haven't created any projects, reading items, or leisure activities yet.
+            <p className="text-blue-700 mb-6 text-lg">
+              Your space to think clearly, act deliberately, and grow on purpose.
             </p>
-            <div className="space-y-2 text-sm text-blue-600">
-              <p>• Start with the <strong>Initial Strategy Setup</strong> to define your life areas and create projects</p>
-              <p>• Add books and articles in the <strong>Reading</strong> section</p>
-              <p>• Track activities you enjoy in the <strong>Leisure</strong> section</p>
-              <p>• Use the <strong>Time Tracker</strong> to log your progress</p>
-              <p>• Schedule regular <strong>Weekly Strategy</strong> sessions to stay on track</p>
+            <div className="space-y-4">
+              <h3 className="text-blue-800 font-semibold text-lg">Let's get you started:</h3>
+              
+              <div className="space-y-4 text-blue-700">
+                <div className="flex gap-3">
+                  <span className="font-semibold text-blue-800">1.</span>
+                  <div>
+                    <div className="font-semibold">Start with a Strategy Session</div>
+                    <div className="text-sm">Define key dissatisfactions, turn them into projects, and set your direction.</div>
+                  </div>
+                </div>
+                
+                <div className="flex gap-3">
+                  <span className="font-semibold text-blue-800">2.</span>
+                  <div>
+                    <div className="font-semibold">Create Your Projects</div>
+                    <div className="text-sm">Capture areas like work, health, learning, or creativity. Break them into tasks and set time goals.</div>
+                  </div>
+                </div>
+                
+                <div className="flex gap-3">
+                  <span className="font-semibold text-blue-800">3.</span>
+                  <div>
+                    <div className="font-semibold">Track Your Time</div>
+                    <div className="text-sm">Use the Pomodoro timer to log time as Invested or Spent. See where your energy is going.</div>
+                  </div>
+                </div>
+                
+                <div className="flex gap-3">
+                  <span className="font-semibold text-blue-800">4.</span>
+                  <div>
+                    <div className="font-semibold">Plan and Reflect Weekly</div>
+                    <div className="text-sm">Run a strategy session each week to review progress, refine projects, and plan your next steps.</div>
+                  </div>
+                </div>
+                
+                <div className="flex gap-3">
+                  <span className="font-semibold text-blue-800">5.</span>
+                  <div>
+                    <div className="font-semibold">Log What You're Learning and Enjoying</div>
+                    <div className="text-sm">Add books, podcasts, or blogs to your reading list. Track leisure activities that recharge you.</div>
+                  </div>
+                </div>
+              </div>
             </div>
           </CardContent>
         </Card>
