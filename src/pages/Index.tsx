@@ -7,7 +7,6 @@ import { ProjectsView } from '@/components/ProjectsView';
 import { TimeTracker } from '@/components/TimeTracker';
 import { ReadingTracker } from '@/components/ReadingTracker';
 import { WritingNotes } from '@/components/WritingNotes';
-import { VoiceMemos } from '@/components/VoiceMemos';
 import { LeisureTracker } from '@/components/LeisureTracker';
 import { WeeklyPlanning } from '@/components/WeeklyPlanning';
 
@@ -28,8 +27,6 @@ const Index = () => {
         return <ReadingTracker />;
       case 'notes':
         return <WritingNotes />;
-      case 'memos':
-        return <VoiceMemos />;
       case 'leisure':
         return <LeisureTracker />;
       case 'planning':

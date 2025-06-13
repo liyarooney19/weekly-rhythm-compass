@@ -7,7 +7,6 @@ import {
   Timer, 
   BookOpen, 
   FileText, 
-  Mic, 
   Calendar,
   Gamepad2
 } from 'lucide-react';
@@ -25,7 +24,6 @@ export const Navigation: React.FC<NavigationProps> = ({ activeView, setActiveVie
     { id: 'timer', label: 'Time Tracker', icon: Timer },
     { id: 'reading', label: 'Reading', icon: BookOpen },
     { id: 'notes', label: 'Notes', icon: FileText },
-    { id: 'memos', label: 'Voice Memos', icon: Mic },
     { id: 'leisure', label: 'Leisure', icon: Gamepad2 },
     { id: 'planning', label: 'Weekly Planning', icon: Calendar },
   ];
