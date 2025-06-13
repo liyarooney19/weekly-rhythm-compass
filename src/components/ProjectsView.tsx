@@ -5,6 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { FolderOpen, Plus, Clock, Target, CheckCircle, Edit2, Trash2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
@@ -205,6 +206,45 @@ export const ProjectsView = () => {
     });
   };
 
+  const deleteProject = (projectId: number, projectName: string) => {
+    const updatedProjects = projects.filter(project => project.id !== projectId);
+    saveProjects(updatedProjects);
+    
+    // If this was the selected project, clear the selection
+    if (selectedProject === projectId) {
+      setSelectedProject(null);
+    }
+    
+    toast({
+      title: "Project Deleted",
+      description: `"${projectName}" has been deleted successfully`
+    });
+  };
+
+  const deleteTask = (projectId: number, taskId: number, taskName: string) => {
+    const updatedProjects = projects.map(project => {
+      if (project.id === projectId) {
+        const updatedTasks = project.tasks.filter(task => task.id !== taskId);
+        const completedTasks = updatedTasks.filter(t => t.completed).length;
+        const progress = updatedTasks.length > 0 ? Math.round((completedTasks / updatedTasks.length) * 100) : 0;
+        
+        return {
+          ...project,
+          tasks: updatedTasks,
+          progress
+        };
+      }
+      return project;
+    });
+
+    saveProjects(updatedProjects);
+    
+    toast({
+      title: "Task Deleted",
+      description: `"${taskName}" has been deleted successfully`
+    });
+  };
+
   const toggleTaskComplete = (projectId: number, taskId: number) => {
     const updatedProjects = projects.map(project => {
       if (project.id === projectId) {
@@ -360,18 +400,48 @@ export const ProjectsView = () => {
               <Card 
                 key={`project-${project.id}`}
                 className="cursor-pointer hover:shadow-md transition-shadow"
-                onClick={() => setSelectedProject(project.id)}
               >
                 <CardHeader className="pb-3">
                   <div className="flex justify-between items-start">
-                    <CardTitle className="text-lg">{project.name}</CardTitle>
-                    <Badge className={getLifeAreaColor(project.lifeArea)}>
-                      {project.lifeArea}
-                    </Badge>
+                    <CardTitle 
+                      className="text-lg cursor-pointer"
+                      onClick={() => setSelectedProject(project.id)}
+                    >
+                      {project.name}
+                    </CardTitle>
+                    <div className="flex items-center gap-2">
+                      <Badge className={getLifeAreaColor(project.lifeArea)}>
+                        {project.lifeArea}
+                      </Badge>
+                      <Dialog>
+                        <DialogTrigger asChild>
+                          <Button size="sm" variant="outline" className="h-6 w-6 p-0">
+                            <Trash2 className="h-3 w-3" />
+                          </Button>
+                        </DialogTrigger>
+                        <DialogContent>
+                          <DialogHeader>
+                            <DialogTitle>Delete Project</DialogTitle>
+                            <DialogDescription>
+                              Are you sure you want to delete "{project.name}"? This action cannot be undone.
+                            </DialogDescription>
+                          </DialogHeader>
+                          <DialogFooter>
+                            <Button variant="outline">Cancel</Button>
+                            <Button 
+                              variant="destructive" 
+                              onClick={() => deleteProject(project.id, project.name)}
+                            >
+                              Delete Project
+                            </Button>
+                          </DialogFooter>
+                        </DialogContent>
+                      </Dialog>
+                    </div>
                   </div>
                   <p className="text-sm text-slate-600">{project.description}</p>
                 </CardHeader>
-                <CardContent className="space-y-4">
+                <CardContent className="space-y-4" onClick={() => setSelectedProject(project.id)}>
                   <div className="space-y-2">
                     <div className="flex justify-between text-sm">
                       <span>Progress</span>
@@ -418,6 +488,31 @@ export const ProjectsView = () => {
                 <Badge className={getLifeAreaColor(project.lifeArea)}>
                   {project.lifeArea}
                 </Badge>
+                <Dialog>
+                  <DialogTrigger asChild>
+                    <Button variant="outline" size="sm">
+                      <Trash2 className="h-4 w-4 mr-2" />
+                      Delete Project
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent>
+                    <DialogHeader>
+                      <DialogTitle>Delete Project</DialogTitle>
+                      <DialogDescription>
+                        Are you sure you want to delete "{project.name}"? This action cannot be undone and will remove all tasks and time logs.
+                      </DialogDescription>
+                    </DialogHeader>
+                    <DialogFooter>
+                      <Button variant="outline">Cancel</Button>
+                      <Button 
+                        variant="destructive" 
+                        onClick={() => deleteProject(project.id, project.name)}
+                      >
+                        Delete Project
+                      </Button>
+                    </DialogFooter>
+                  </DialogContent>
+                </Dialog>
               </div>
 
               <Card>
@@ -510,6 +605,30 @@ export const ProjectsView = () => {
                             <Clock className="h-4 w-4 mr-1" />
                             Start Timer
                           </Button>
+                          <Dialog>
+                            <DialogTrigger asChild>
+                              <Button size="sm" variant="outline">
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </DialogTrigger>
+                            <DialogContent>
+                              <DialogHeader>
+                                <DialogTitle>Delete Task</DialogTitle>
+                                <DialogDescription>
+                                  Are you sure you want to delete "{task.name}"? This action cannot be undone.
+                                </DialogDescription>
+                              </DialogHeader>
+                              <DialogFooter>
+                                <Button variant="outline">Cancel</Button>
+                                <Button 
+                                  variant="destructive" 
+                                  onClick={() => deleteTask(project.id, task.id, task.name)}
+                                >
+                                  Delete Task
+                                </Button>
+                              </DialogFooter>
+                            </DialogContent>
+                          </Dialog>
                         </div>
                       </div>
                     ))}
