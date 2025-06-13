@@ -257,11 +257,20 @@ export const ProjectsView = () => {
   };
 
   const calculateProjectTotals = (project: Project) => {
-    const totalInvested = project.tasks.reduce((sum, task) => sum + task.investedHours, 0);
-    const totalSpent = project.tasks.reduce((sum, task) => sum + task.spentHours, 0);
+    // Calculate totals from tasks
+    const taskInvested = project.tasks.reduce((sum, task) => sum + (task.investedHours || 0), 0);
+    const taskSpent = project.tasks.reduce((sum, task) => sum + (task.spentHours || 0), 0);
+    
+    // Add direct project time (for general project work)
+    const projectInvested = project.investedHours || 0;
+    const projectSpent = project.spentHours || 0;
+    
+    const totalInvested = taskInvested + projectInvested;
+    const totalSpent = taskSpent + projectSpent;
+    
     return {
-      totalInvested: totalInvested,
-      totalSpent: totalSpent,
+      totalInvested,
+      totalSpent,
       totalHours: totalInvested + totalSpent
     };
   };

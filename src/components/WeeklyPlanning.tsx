@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -37,6 +36,7 @@ export const WeeklyPlanning = () => {
   useEffect(() => {
     loadTasks();
     loadProjects();
+    syncWithTimeLogs();
   }, []);
 
   const loadTasks = () => {
@@ -150,10 +150,81 @@ export const WeeklyPlanning = () => {
     });
   };
 
+  const syncWithTimeLogs = () => {
+    const savedLogs = localStorage.getItem('timeLogs');
+    if (!savedLogs) return;
+
+    try {
+      const logs = JSON.parse(savedLogs);
+      const oneWeekAgo = new Date();
+      oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
+      
+      // Get this week's logs
+      const weeklyLogs = logs.filter((log: any) => {
+        const logDate = new Date(log.timestamp);
+        return logDate >= oneWeekAgo;
+      });
+
+      // Update task completed status based on actual time logged
+      const savedTasks = localStorage.getItem('weeklyTasks');
+      if (savedTasks) {
+        const tasks = JSON.parse(savedTasks);
+        const updatedTasks = tasks.map((task: any) => {
+          const taskLogs = weeklyLogs.filter((log: any) => 
+            log.projectId === task.projectId && log.taskId === task.taskId
+          );
+          const totalLogged = taskLogs.reduce((sum: number, log: any) => sum + (log.duration / 60), 0);
+          
+          // Mark as completed if logged time meets or exceeds estimated time
+          if (totalLogged >= task.estimatedHours && !task.completed) {
+            return { ...task, completed: true };
+          }
+          return task;
+        });
+        
+        localStorage.setItem('weeklyTasks', JSON.stringify(updatedTasks));
+        setTasks(updatedTasks);
+      }
+    } catch (error) {
+      console.error('Error syncing with time logs:', error);
+    }
+  };
+
   const totalPlannedHours = tasks.reduce((sum, task) => sum + task.estimatedHours, 0);
   const investedHours = tasks.filter(task => task.timeType === 'invested').reduce((sum, task) => sum + task.estimatedHours, 0);
   const spentHours = tasks.filter(task => task.timeType === 'spent').reduce((sum, task) => sum + task.estimatedHours, 0);
   const completedTasks = tasks.filter(task => task.completed).length;
+
+  const getActualLoggedHours = () => {
+    const savedLogs = localStorage.getItem('timeLogs');
+    if (!savedLogs) return { actualInvested: 0, actualSpent: 0 };
+
+    try {
+      const logs = JSON.parse(savedLogs);
+      const oneWeekAgo = new Date();
+      oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
+      
+      const weeklyLogs = logs.filter((log: any) => {
+        const logDate = new Date(log.timestamp);
+        return logDate >= oneWeekAgo;
+      });
+
+      const actualInvested = weeklyLogs
+        .filter((log: any) => log.type === 'invested')
+        .reduce((sum: number, log: any) => sum + (log.duration / 60), 0);
+      
+      const actualSpent = weeklyLogs
+        .filter((log: any) => log.type === 'spent')
+        .reduce((sum: number, log: any) => sum + (log.duration / 60), 0);
+
+      return { actualInvested, actualSpent };
+    } catch (error) {
+      console.error('Error calculating actual hours:', error);
+      return { actualInvested: 0, actualSpent: 0 };
+    }
+  };
+
+  const { actualInvested, actualSpent } = getActualLoggedHours();
 
   const selectedProjectData = projects.find(p => p.id.toString() === selectedProject);
   const availableTasks = selectedProjectData?.tasks || [];
@@ -171,7 +242,7 @@ export const WeeklyPlanning = () => {
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-slate-600">Total Planned</p>
+                <p className="text-sm text-slate-600">Planned Hours</p>
                 <p className="text-2xl font-bold text-slate-800">{totalPlannedHours}h</p>
               </div>
               <Clock className="h-8 w-8 text-slate-400" />
@@ -183,8 +254,9 @@ export const WeeklyPlanning = () => {
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-slate-600">Invested Time</p>
-                <p className="text-2xl font-bold text-green-600">{investedHours}h</p>
+                <p className="text-sm text-slate-600">Actual Invested</p>
+                <p className="text-2xl font-bold text-green-600">{actualInvested.toFixed(1)}h</p>
+                <p className="text-xs text-slate-500">Planned: {investedHours}h</p>
               </div>
               <Target className="h-8 w-8 text-green-400" />
             </div>
@@ -195,8 +267,9 @@ export const WeeklyPlanning = () => {
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-slate-600">Spent Time</p>
-                <p className="text-2xl font-bold text-orange-600">{spentHours}h</p>
+                <p className="text-sm text-slate-600">Actual Spent</p>
+                <p className="text-2xl font-bold text-orange-600">{actualSpent.toFixed(1)}h</p>
+                <p className="text-xs text-slate-500">Planned: {spentHours}h</p>
               </div>
               <Calendar className="h-8 w-8 text-orange-400" />
             </div>
@@ -255,7 +328,6 @@ export const WeeklyPlanning = () => {
               disabled={!selectedProject || availableTasks.length === 0}
               onClick={() => {
                 if (availableTasks.length > 0) {
-                  // Add first available task if none selected
                   addExistingTask(selectedProject, availableTasks[0].id.toString());
                 }
               }}

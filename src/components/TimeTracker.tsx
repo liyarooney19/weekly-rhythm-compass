@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -132,7 +131,7 @@ export const TimeTracker = () => {
 
     const timeLog: TimeLog = {
       project: project.name,
-      task: task?.name,
+      task: task?.name || 'General project work',
       duration: Math.round(duration / 60), // Convert seconds to minutes
       type: timeType,
       timestamp: new Date().toISOString(),
@@ -149,6 +148,9 @@ export const TimeTracker = () => {
     // Update project/task hours
     if (task && project) {
       updateTaskHours(project.id, task.id, timeLog.duration, timeType);
+    } else {
+      // Handle general project work
+      updateProjectHours(project.id, timeLog.duration, timeType);
     }
 
     setRecentLogs(prev => [...prev, timeLog].slice(-10));
@@ -187,6 +189,31 @@ export const TimeTracker = () => {
       loadProjects(); // Reload to get updated data
     } catch (error) {
       console.error('Error updating task hours:', error);
+    }
+  };
+
+  const updateProjectHours = (projectId: number, minutes: number, type: 'invested' | 'spent') => {
+    const savedProjects = localStorage.getItem('projects');
+    if (!savedProjects) return;
+
+    try {
+      const projects = JSON.parse(savedProjects);
+      const updatedProjects = projects.map((project: any) => {
+        if (project.id === projectId) {
+          const hours = minutes / 60;
+          return {
+            ...project,
+            [type === 'invested' ? 'investedHours' : 'spentHours']: 
+              (project[type === 'invested' ? 'investedHours' : 'spentHours'] || 0) + hours
+          };
+        }
+        return project;
+      });
+      
+      localStorage.setItem('projects', JSON.stringify(updatedProjects));
+      loadProjects();
+    } catch (error) {
+      console.error('Error updating project hours:', error);
     }
   };
 
@@ -324,7 +351,7 @@ export const TimeTracker = () => {
                       <SelectValue placeholder="Select a task (optional)..." />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="general">General project work</SelectItem>
+                      <SelectItem value="">General project work</SelectItem>
                       {availableTasks.map((task) => (
                         <SelectItem key={`task-select-${task.id}`} value={task.id.toString()}>
                           {task.name}
@@ -419,8 +446,13 @@ export const TimeTracker = () => {
         <CardContent>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {projects.slice(0, 6).map((project) => {
-              const totalInvested = project.tasks?.reduce((sum, task) => sum + (task.investedHours || 0), 0) || 0;
-              const totalSpent = project.tasks?.reduce((sum, task) => sum + (task.spentHours || 0), 0) || 0;
+              // Calculate totals from both tasks and direct project time
+              const taskInvested = project.tasks?.reduce((sum, task) => sum + (task.investedHours || 0), 0) || 0;
+              const taskSpent = project.tasks?.reduce((sum, task) => sum + (task.spentHours || 0), 0) || 0;
+              const projectInvested = project.investedHours || 0;
+              const projectSpent = project.spentHours || 0;
+              const totalInvested = taskInvested + projectInvested;
+              const totalSpent = taskSpent + projectSpent;
               
               return (
                 <div key={`summary-${project.id}`} className="p-4 border border-slate-200 rounded-lg">
