@@ -1,60 +1,122 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
-import { BookOpen, Plus, Calendar, Share2 } from 'lucide-react';
+import { BookOpen, Plus, Share2 } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
+
+interface ReadingItem {
+  id: number;
+  title: string;
+  type: 'book' | 'podcast' | 'article' | 'blog';
+  category: string;
+  progress: number;
+  weeklyGoal: number;
+  timeSpent: string;
+  dateAdded: string;
+}
 
 export const ReadingTracker = () => {
   const [newItem, setNewItem] = useState({ title: '', type: 'book', category: 'productivity' });
+  const [readingItems, setReadingItems] = useState<ReadingItem[]>([]);
+  const { toast } = useToast();
   
   const categories = ['productivity', 'fiction', 'business', 'technology', 'health', 'philosophy'];
   const types = ['book', 'podcast', 'article', 'blog'];
 
-  // Mock reading data
-  const currentReading = [
-    { 
-      title: 'Atomic Habits', 
-      type: 'book', 
-      category: 'productivity', 
-      progress: 65,
-      weeklyGoal: 50,
-      timeSpent: '3.2h'
-    },
-    { 
-      title: 'The Tim Ferriss Show', 
-      type: 'podcast', 
-      category: 'business', 
-      progress: 100,
-      weeklyGoal: 100,
-      timeSpent: '2.1h'
-    },
-    { 
-      title: 'React Patterns', 
-      type: 'article', 
-      category: 'technology', 
-      progress: 80,
-      weeklyGoal: 100,
-      timeSpent: '1.5h'
-    },
-  ];
+  useEffect(() => {
+    loadReadingItems();
+  }, []);
 
-  const weeklyPlan = [
-    { day: 'Monday', planned: 'Atomic Habits - Chapter 3', completed: true },
-    { day: 'Tuesday', planned: 'Tech podcast + 2 articles', completed: true },
-    { day: 'Wednesday', planned: 'Continue Atomic Habits', completed: false },
-    { day: 'Thursday', planned: 'Philosophy blog posts', completed: false },
-    { day: 'Friday', planned: 'Weekly review + new book', completed: false },
-  ];
+  const loadReadingItems = () => {
+    const saved = localStorage.getItem('readingItems');
+    if (saved) {
+      try {
+        setReadingItems(JSON.parse(saved));
+      } catch (error) {
+        console.error('Error loading reading items:', error);
+      }
+    } else {
+      // Default items
+      const defaultItems: ReadingItem[] = [
+        { 
+          id: 1,
+          title: 'Atomic Habits', 
+          type: 'book', 
+          category: 'productivity', 
+          progress: 65,
+          weeklyGoal: 50,
+          timeSpent: '3.2h',
+          dateAdded: new Date().toISOString()
+        },
+        { 
+          id: 2,
+          title: 'The Tim Ferriss Show', 
+          type: 'podcast', 
+          category: 'business', 
+          progress: 100,
+          weeklyGoal: 100,
+          timeSpent: '2.1h',
+          dateAdded: new Date().toISOString()
+        },
+        { 
+          id: 3,
+          title: 'React Patterns', 
+          type: 'article', 
+          category: 'technology', 
+          progress: 80,
+          weeklyGoal: 100,
+          timeSpent: '1.5h',
+          dateAdded: new Date().toISOString()
+        },
+      ];
+      setReadingItems(defaultItems);
+      localStorage.setItem('readingItems', JSON.stringify(defaultItems));
+    }
+  };
+
+  const addReadingItem = () => {
+    if (!newItem.title.trim()) {
+      toast({
+        title: "Error",
+        description: "Please enter a title",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    const item: ReadingItem = {
+      id: Date.now(),
+      title: newItem.title,
+      type: newItem.type as 'book' | 'podcast' | 'article' | 'blog',
+      category: newItem.category,
+      progress: 0,
+      weeklyGoal: 50,
+      timeSpent: '0h',
+      dateAdded: new Date().toISOString()
+    };
+
+    const updatedItems = [...readingItems, item];
+    setReadingItems(updatedItems);
+    localStorage.setItem('readingItems', JSON.stringify(updatedItems));
+    
+    setNewItem({ title: '', type: 'book', category: 'productivity' });
+    
+    toast({
+      title: "Success",
+      description: "Reading item added successfully"
+    });
+  };
 
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <div>
           <h1 className="text-3xl font-bold text-slate-800 mb-2">Reading Tracker</h1>
-          <p className="text-slate-600">Books, podcasts, and articles with weekly planning</p>
+          <p className="text-slate-600">Books, podcasts, and articles tracking</p>
         </div>
         <Button className="flex items-center gap-2">
           <Share2 className="h-4 w-4" />
@@ -99,72 +161,46 @@ export const ReadingTracker = () => {
                 </option>
               ))}
             </select>
-            <Button>Add Item</Button>
+            <Button onClick={addReadingItem}>Add Item</Button>
           </div>
         </CardContent>
       </Card>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Current Reading */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <BookOpen className="h-5 w-5" />
-              Currently Reading
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {currentReading.map((item, index) => (
-              <div key={index} className="p-4 border border-slate-200 rounded-lg space-y-3">
-                <div className="flex justify-between items-start">
-                  <div>
-                    <h3 className="font-medium">{item.title}</h3>
-                    <div className="flex gap-2 mt-1">
-                      <Badge variant="outline">{item.type}</Badge>
-                      <Badge variant="secondary">{item.category}</Badge>
-                    </div>
+      {/* Current Reading */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <BookOpen className="h-5 w-5" />
+            Currently Reading
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {readingItems.map((item) => (
+            <div key={item.id} className="p-4 border border-slate-200 rounded-lg space-y-3">
+              <div className="flex justify-between items-start">
+                <div>
+                  <h3 className="font-medium">{item.title}</h3>
+                  <div className="flex gap-2 mt-1">
+                    <Badge variant="outline">{item.type}</Badge>
+                    <Badge variant="secondary">{item.category}</Badge>
                   </div>
-                  <span className="text-sm text-slate-500">{item.timeSpent}</span>
                 </div>
-                <div className="space-y-1">
-                  <div className="flex justify-between text-sm">
-                    <span>Progress</span>
-                    <span>{item.progress}%</span>
-                  </div>
-                  <Progress value={item.progress} className="h-2" />
-                  <div className="text-xs text-slate-500">
-                    Weekly goal: {item.weeklyGoal}%
-                  </div>
+                <span className="text-sm text-slate-500">{item.timeSpent}</span>
+              </div>
+              <div className="space-y-1">
+                <div className="flex justify-between text-sm">
+                  <span>Progress</span>
+                  <span>{item.progress}%</span>
+                </div>
+                <Progress value={item.progress} className="h-2" />
+                <div className="text-xs text-slate-500">
+                  Weekly goal: {item.weeklyGoal}%
                 </div>
               </div>
-            ))}
-          </CardContent>
-        </Card>
-
-        {/* Weekly Reading Plan */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Calendar className="h-5 w-5" />
-              Weekly Reading Plan
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              {weeklyPlan.map((day, index) => (
-                <div key={index} className="flex items-center gap-3 p-3 rounded-lg bg-slate-50">
-                  <div className="w-2 h-2 rounded-full bg-blue-500"></div>
-                  <div className="flex-1">
-                    <div className="font-medium text-sm">{day.day}</div>
-                    <div className="text-sm text-slate-600">{day.planned}</div>
-                  </div>
-                  <div className={`w-4 h-4 rounded-full ${day.completed ? 'bg-green-500' : 'bg-slate-300'}`}></div>
-                </div>
-              ))}
             </div>
-          </CardContent>
-        </Card>
-      </div>
+          ))}
+        </CardContent>
+      </Card>
 
       {/* Category Overview */}
       <Card>
@@ -173,13 +209,16 @@ export const ReadingTracker = () => {
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-            {categories.map((category) => (
-              <div key={category} className="text-center p-4 border border-slate-200 rounded-lg">
-                <div className="text-lg font-bold text-blue-600">3</div>
-                <div className="text-sm text-slate-600 capitalize">{category}</div>
-                <div className="text-xs text-slate-500 mt-1">12.5h this week</div>
-              </div>
-            ))}
+            {categories.map((category) => {
+              const categoryCount = readingItems.filter(item => item.category === category).length;
+              return (
+                <div key={category} className="text-center p-4 border border-slate-200 rounded-lg">
+                  <div className="text-lg font-bold text-blue-600">{categoryCount}</div>
+                  <div className="text-sm text-slate-600 capitalize">{category}</div>
+                  <div className="text-xs text-slate-500 mt-1">items</div>
+                </div>
+              );
+            })}
           </div>
         </CardContent>
       </Card>

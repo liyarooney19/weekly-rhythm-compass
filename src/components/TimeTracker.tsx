@@ -196,8 +196,17 @@ export const TimeTracker = () => {
       }, 1000);
     } else if (seconds === 0) {
       setIsRunning(false);
-      const sessionLength = 25 * 60; // Default session length
+      const sessionLength = 25 * 60;
       saveTimeLog(sessionLength);
+      
+      // Play notification sound
+      const audio = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+LvwGwyBz2Y3PLEfzMELYPL8dySQAkTYrfr5Z5PFAg+ltryy38yBC+Cy/HdjkMJEnTHmdhwOH');
+      audio.play().catch(() => console.log('Audio notification failed'));
+      
+      toast({
+        title: "Time's Up!",
+        description: "Your Pomodoro session has ended",
+      });
     }
     return () => clearInterval(interval);
   }, [isRunning, seconds]);
@@ -296,13 +305,13 @@ export const TimeTracker = () => {
 
               {selectedProjectData && availableTasks.length > 0 && (
                 <div>
-                  <label className="block text-sm font-medium mb-2">Task (Optional)</label>
+                  <label className="block text-sm font-medium mb-2">Task</label>
                   <Select value={selectedTask} onValueChange={setSelectedTask}>
                     <SelectTrigger>
                       <SelectValue placeholder="Select a task..." />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">No specific task</SelectItem>
+                      <SelectItem value="">General project work</SelectItem>
                       {availableTasks.map((task) => (
                         <SelectItem key={task.id} value={task.id.toString()}>
                           {task.name}

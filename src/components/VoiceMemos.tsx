@@ -1,44 +1,74 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Mic, Play, Pause, Square, Link, FileText, FolderOpen } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Mic, Play, Pause, Square, Link, FileText, FolderOpen, Trash2 } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
+
+interface VoiceMemo {
+  id: number;
+  title: string;
+  duration: string;
+  timestamp: string;
+  transcription: string;
+  linkedTo?: { type: 'project' | 'note'; name: string; id: number };
+  tags: string[];
+}
 
 export const VoiceMemos = () => {
   const [isRecording, setIsRecording] = useState(false);
   const [recordingTime, setRecordingTime] = useState(0);
+  const [voiceMemos, setVoiceMemos] = useState<VoiceMemo[]>([]);
+  const [newMemoTitle, setNewMemoTitle] = useState('');
+  const [newMemoTranscription, setNewMemoTranscription] = useState('');
+  const [newMemoTags, setNewMemoTags] = useState('');
+  const [projects, setProjects] = useState<any[]>([]);
+  const { toast } = useToast();
 
-  // Mock voice memos data
-  const voiceMemos = [
-    {
-      id: 1,
-      title: 'Project idea for fitness tracking',
-      duration: '2:34',
-      timestamp: '1 hour ago',
-      transcription: 'What if we built an app that tracks not just workouts but energy levels throughout the day...',
-      linkedTo: { type: 'project', name: 'Fitness App' },
-      tags: ['idea', 'fitness', 'app']
-    },
-    {
-      id: 2,
-      title: 'Reflection on productivity',
-      duration: '1:45',
-      timestamp: '3 hours ago',
-      transcription: 'I noticed that I\'m most productive between 9-11 AM. Should structure my day around this...',
-      linkedTo: { type: 'note', name: 'Productivity insights' },
-      tags: ['reflection', 'productivity']
-    },
-    {
-      id: 3,
-      title: 'Reading thoughts on Atomic Habits',
-      duration: '3:12',
-      timestamp: '1 day ago',
-      transcription: 'The concept of habit stacking really resonates with me. Could apply this to my morning routine...',
-      linkedTo: null,
-      tags: ['reading', 'habits']
-    },
-  ];
+  useEffect(() => {
+    loadVoiceMemos();
+    loadProjects();
+  }, []);
+
+  useEffect(() => {
+    let interval: NodeJS.Timeout;
+    if (isRecording) {
+      interval = setInterval(() => {
+        setRecordingTime(prev => prev + 1);
+      }, 1000);
+    }
+    return () => clearInterval(interval);
+  }, [isRecording]);
+
+  const loadVoiceMemos = () => {
+    const saved = localStorage.getItem('voiceMemos');
+    if (saved) {
+      try {
+        setVoiceMemos(JSON.parse(saved));
+      } catch (error) {
+        console.error('Error loading voice memos:', error);
+      }
+    }
+  };
+
+  const loadProjects = () => {
+    const savedProjects = localStorage.getItem('projects');
+    if (savedProjects) {
+      try {
+        setProjects(JSON.parse(savedProjects));
+      } catch (error) {
+        console.error('Error loading projects:', error);
+      }
+    }
+  };
+
+  const saveVoiceMemos = (memos: VoiceMemo[]) => {
+    setVoiceMemos(memos);
+    localStorage.setItem('voiceMemos', JSON.stringify(memos));
+  };
 
   const formatRecordingTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
@@ -48,13 +78,94 @@ export const VoiceMemos = () => {
 
   const startRecording = () => {
     setIsRecording(true);
-    // Here you would start actual recording
+    setRecordingTime(0);
   };
 
   const stopRecording = () => {
     setIsRecording(false);
+    
+    if (recordingTime > 0) {
+      // Show form to save memo
+      setNewMemoTitle(`Voice memo ${new Date().toLocaleString()}`);
+      setNewMemoTranscription('');
+      setNewMemoTags('');
+    }
+  };
+
+  const saveMemo = () => {
+    if (!newMemoTitle.trim()) {
+      toast({
+        title: "Error",
+        description: "Please enter a title for the memo",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    const memo: VoiceMemo = {
+      id: Date.now(),
+      title: newMemoTitle,
+      duration: formatRecordingTime(recordingTime),
+      timestamp: new Date().toISOString(),
+      transcription: newMemoTranscription,
+      tags: newMemoTags.split(',').map(tag => tag.trim()).filter(tag => tag)
+    };
+
+    const updatedMemos = [...voiceMemos, memo];
+    saveVoiceMemos(updatedMemos);
+    
+    setNewMemoTitle('');
+    setNewMemoTranscription('');
+    setNewMemoTags('');
     setRecordingTime(0);
-    // Here you would stop recording and save the memo
+    
+    toast({
+      title: "Success",
+      description: "Voice memo saved successfully"
+    });
+  };
+
+  const linkToProject = (memoId: number, projectId: string, projectName: string) => {
+    const updatedMemos = voiceMemos.map(memo => 
+      memo.id === memoId 
+        ? { ...memo, linkedTo: { type: 'project' as const, name: projectName, id: parseInt(projectId) } }
+        : memo
+    );
+    saveVoiceMemos(updatedMemos);
+    
+    toast({
+      title: "Success",
+      description: "Memo linked to project"
+    });
+  };
+
+  const convertToNote = (memo: VoiceMemo) => {
+    const notes = JSON.parse(localStorage.getItem('writingNotes') || '[]');
+    const newNote = {
+      id: Date.now(),
+      topic: 'voice-memo',
+      content: `${memo.title}\n\n${memo.transcription}`,
+      timestamp: new Date().toISOString(),
+      status: 'active'
+    };
+    
+    notes.push(newNote);
+    localStorage.setItem('writingNotes', JSON.stringify(notes));
+    
+    toast({
+      title: "Success",
+      description: "Voice memo converted to note"
+    });
+  };
+
+  const deleteMemo = (memoId: number) => {
+    const updatedMemos = voiceMemos.filter(memo => memo.id !== memoId);
+    saveVoiceMemos(updatedMemos);
+    
+    toast({
+      title: "Success",
+      description: "Voice memo deleted"
+    });
   };
 
   return (
@@ -91,13 +202,6 @@ export const VoiceMemos = () => {
                 <div className="flex gap-2">
                   <Button
                     size="lg"
-                    variant="outline"
-                    className="rounded-full w-16 h-16"
-                  >
-                    <Pause className="h-6 w-6" />
-                  </Button>
-                  <Button
-                    size="lg"
                     onClick={stopRecording}
                     variant="outline"
                     className="rounded-full w-16 h-16"
@@ -122,6 +226,36 @@ export const VoiceMemos = () => {
         </CardContent>
       </Card>
 
+      {/* Save New Memo Form */}
+      {recordingTime > 0 && !isRecording && (
+        <Card className="border-2 border-blue-500">
+          <CardHeader>
+            <CardTitle>Save Voice Memo</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <Input
+              placeholder="Memo title..."
+              value={newMemoTitle}
+              onChange={(e) => setNewMemoTitle(e.target.value)}
+            />
+            <Input
+              placeholder="Transcription (optional)..."
+              value={newMemoTranscription}
+              onChange={(e) => setNewMemoTranscription(e.target.value)}
+            />
+            <Input
+              placeholder="Tags (comma separated)..."
+              value={newMemoTags}
+              onChange={(e) => setNewMemoTags(e.target.value)}
+            />
+            <div className="flex gap-2">
+              <Button onClick={saveMemo}>Save Memo</Button>
+              <Button variant="outline" onClick={() => setRecordingTime(0)}>Cancel</Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Voice Memos List */}
       <div className="space-y-4">
         {voiceMemos.map((memo) => (
@@ -140,7 +274,9 @@ export const VoiceMemos = () => {
                 </div>
                 <div className="text-right">
                   <div className="text-sm font-mono text-slate-600">{memo.duration}</div>
-                  <div className="text-xs text-slate-500">{memo.timestamp}</div>
+                  <div className="text-xs text-slate-500">
+                    {new Date(memo.timestamp).toLocaleDateString()}
+                  </div>
                 </div>
               </div>
 
@@ -157,22 +293,42 @@ export const VoiceMemos = () => {
                 </div>
               )}
 
-              <div className="bg-slate-50 p-3 rounded-lg mb-3">
-                <p className="text-sm text-slate-700 italic">"{memo.transcription}"</p>
-              </div>
+              {memo.transcription && (
+                <div className="bg-slate-50 p-3 rounded-lg mb-3">
+                  <p className="text-sm text-slate-700 italic">"{memo.transcription}"</p>
+                </div>
+              )}
 
-              <div className="flex gap-2">
+              <div className="flex gap-2 flex-wrap">
                 <Button size="sm" variant="outline">
                   <Play className="h-4 w-4 mr-1" />
                   Play
                 </Button>
-                <Button size="sm" variant="outline">
-                  <Link className="h-4 w-4 mr-1" />
-                  Link to Project
-                </Button>
-                <Button size="sm" variant="outline">
+                
+                <Select onValueChange={(value) => {
+                  const project = projects.find(p => p.id.toString() === value);
+                  if (project) linkToProject(memo.id, value, project.name);
+                }}>
+                  <SelectTrigger className="w-auto">
+                    <SelectValue placeholder="Link to Project" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {projects.map((project) => (
+                      <SelectItem key={project.id} value={project.id.toString()}>
+                        {project.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                
+                <Button size="sm" variant="outline" onClick={() => convertToNote(memo)}>
                   <FileText className="h-4 w-4 mr-1" />
                   Convert to Note
+                </Button>
+                
+                <Button size="sm" variant="outline" onClick={() => deleteMemo(memo.id)}>
+                  <Trash2 className="h-4 w-4 mr-1" />
+                  Delete
                 </Button>
               </div>
             </CardContent>
@@ -188,19 +344,25 @@ export const VoiceMemos = () => {
         <CardContent>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <div className="text-center p-4 border border-slate-200 rounded-lg">
-              <div className="text-2xl font-bold text-blue-600">15</div>
+              <div className="text-2xl font-bold text-blue-600">{voiceMemos.length}</div>
               <div className="text-sm text-slate-600">Total Memos</div>
             </div>
             <div className="text-center p-4 border border-slate-200 rounded-lg">
-              <div className="text-2xl font-bold text-green-600">8</div>
+              <div className="text-2xl font-bold text-green-600">
+                {voiceMemos.filter(m => m.linkedTo).length}
+              </div>
               <div className="text-sm text-slate-600">Linked Items</div>
             </div>
             <div className="text-center p-4 border border-slate-200 rounded-lg">
-              <div className="text-2xl font-bold text-purple-600">45min</div>
-              <div className="text-sm text-slate-600">This Week</div>
+              <div className="text-2xl font-bold text-purple-600">
+                {voiceMemos.filter(m => m.timestamp.startsWith(new Date().toISOString().split('T')[0])).length}
+              </div>
+              <div className="text-sm text-slate-600">Today</div>
             </div>
             <div className="text-center p-4 border border-slate-200 rounded-lg">
-              <div className="text-2xl font-bold text-orange-600">3</div>
+              <div className="text-2xl font-bold text-orange-600">
+                {voiceMemos.filter(m => !m.linkedTo).length}
+              </div>
               <div className="text-sm text-slate-600">Unlinked</div>
             </div>
           </div>
