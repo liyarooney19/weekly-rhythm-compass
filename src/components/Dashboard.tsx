@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -16,6 +15,7 @@ export const Dashboard = () => {
   const [timeLogs, setTimeLogs] = useState<any[]>([]);
   const [strategyDay, setStrategyDay] = useState('Sunday');
   const [currentSession, setCurrentSession] = useState<any>(null);
+  const [sessionHistory, setSessionHistory] = useState<any[]>([]);
 
   useEffect(() => {
     loadData();
@@ -45,6 +45,12 @@ export const Dashboard = () => {
     if (savedCurrentSession) {
       setCurrentSession(JSON.parse(savedCurrentSession));
     }
+
+    // Load session history
+    const savedHistory = localStorage.getItem('strategySessionHistory');
+    if (savedHistory) {
+      setSessionHistory(JSON.parse(savedHistory));
+    }
   };
 
   const resetAllData = () => {
@@ -62,6 +68,7 @@ export const Dashboard = () => {
     localStorage.removeItem('strategyDay');
     localStorage.removeItem('currentStrategySession');
     localStorage.removeItem('weeklyStrategyAgenda');
+    localStorage.removeItem('strategySessionHistory');
     
     toast({
       title: "Success",
@@ -114,24 +121,57 @@ export const Dashboard = () => {
   const activeProjects = getActiveProjects();
   const activeProjectsCount = projects.filter(project => project.status === 'active' || !project.status).length;
 
-  // Updated strategy session logic
+  // Updated strategy session logic with proper next date calculation
+  const getLastCompletedSessionDate = () => {
+    if (sessionHistory.length === 0) return null;
+    const sortedHistory = sessionHistory
+      .filter(session => session.completed)
+      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    return sortedHistory.length > 0 ? new Date(sortedHistory[0].date) : null;
+  };
+
   const isStrategySessionDue = () => {
+    if (currentSession) return false;
+    
     const today = new Date();
     const dayIndex = today.getDay();
     const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
     const targetDayIndex = days.indexOf(strategyDay);
-    return dayIndex === targetDayIndex && !currentSession;
+    
+    // If today is the strategy day
+    if (dayIndex === targetDayIndex) {
+      const lastCompleted = getLastCompletedSessionDate();
+      if (!lastCompleted) return true; // No sessions completed yet
+      
+      // Check if last session was completed before today
+      const todayStart = new Date(today);
+      todayStart.setHours(0, 0, 0, 0);
+      return lastCompleted < todayStart;
+    }
+    
+    return false;
   };
 
   const getNextStrategyDate = () => {
     const today = new Date();
     const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
     const targetDayIndex = days.indexOf(strategyDay);
-    const todayIndex = today.getDay();
-    const daysUntil = (targetDayIndex - todayIndex + 7) % 7;
-    const nextSession = new Date(today);
-    nextSession.setDate(today.getDate() + (daysUntil === 0 ? 7 : daysUntil));
-    return nextSession.toLocaleDateString();
+    
+    const lastCompleted = getLastCompletedSessionDate();
+    
+    if (lastCompleted) {
+      // Calculate next session from last completed date
+      const nextSession = new Date(lastCompleted);
+      nextSession.setDate(lastCompleted.getDate() + 7); // Add 7 days for weekly interval
+      return nextSession.toLocaleDateString();
+    } else {
+      // No completed sessions yet, calculate from today
+      const todayIndex = today.getDay();
+      const daysUntil = (targetDayIndex - todayIndex + 7) % 7;
+      const nextSession = new Date(today);
+      nextSession.setDate(today.getDate() + (daysUntil === 0 ? 7 : daysUntil));
+      return nextSession.toLocaleDateString();
+    }
   };
 
   const getStrategySessionStatus = () => {
@@ -411,4 +451,3 @@ export const Dashboard = () => {
     </div>
   );
 };
-
