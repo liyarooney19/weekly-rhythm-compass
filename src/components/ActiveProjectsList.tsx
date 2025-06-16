@@ -2,7 +2,6 @@
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Progress } from '@/components/ui/progress';
 import { Clock, Target, Timer } from 'lucide-react';
 
 interface Project {
@@ -118,7 +117,6 @@ export const ActiveProjectsList = () => {
               const weeklyHours = getWeeklyHours(project.name);
               const completedTasks = project.tasks.filter(t => t.completed).length;
               const totalTasks = project.tasks.length;
-              const completionRate = totalTasks > 0 ? (completedTasks / totalTasks) * 100 : 0;
 
               return (
                 <div 
@@ -140,7 +138,7 @@ export const ActiveProjectsList = () => {
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-3 gap-4 text-sm mb-3">
+                  <div className="grid grid-cols-3 gap-4 text-sm">
                     <div className="text-center">
                       <div className="flex items-center justify-center gap-1 text-green-600">
                         <Target className="h-3 w-3" />
@@ -162,16 +160,6 @@ export const ActiveProjectsList = () => {
                       <div className="text-xs text-slate-500">tasks</div>
                     </div>
                   </div>
-
-                  {totalTasks > 0 && (
-                    <div className="space-y-1">
-                      <div className="flex justify-between text-xs text-slate-500">
-                        <span>Task Progress</span>
-                        <span>{completionRate.toFixed(0)}%</span>
-                      </div>
-                      <Progress value={completionRate} className="h-1.5" />
-                    </div>
-                  )}
                 </div>
               );
             })}

@@ -45,6 +45,7 @@ interface StrategySession {
 export const Dashboard = () => {
   const { toast } = useToast();
   const [projects, setProjects] = useState<Project[]>([]);
+  const [timeLogs, setTimeLogs] = useState<TimeLog[]>([]);
 
   useEffect(() => {
     loadData();
@@ -55,6 +56,40 @@ export const Dashboard = () => {
     if (savedProjects) {
       setProjects(JSON.parse(savedProjects));
     }
+
+    const savedTimeLogs = localStorage.getItem('timeLogs');
+    if (savedTimeLogs) {
+      setTimeLogs(JSON.parse(savedTimeLogs));
+    }
+  };
+
+  const getWeeklyTimeData = () => {
+    const now = new Date();
+    const startOfWeek = new Date(now);
+    startOfWeek.setDate(now.getDate() - now.getDay()); // Start of current week (Sunday)
+    startOfWeek.setHours(0, 0, 0, 0);
+
+    const weeklyLogs = timeLogs.filter(log => {
+      const logDate = new Date(log.timestamp);
+      return logDate >= startOfWeek;
+    });
+
+    const invested = weeklyLogs
+      .filter(log => log.type === 'invested')
+      .reduce((sum, log) => sum + log.duration, 0) / 60; // Convert to hours
+
+    const spent = weeklyLogs
+      .filter(log => log.type === 'spent')
+      .reduce((sum, log) => sum + log.duration, 0) / 60; // Convert to hours
+
+    return { invested, spent };
+  };
+
+  const formatHours = (hours: number) => {
+    if (hours < 1) {
+      return `${Math.round(hours * 60)}m`;
+    }
+    return `${hours.toFixed(1)}h`;
   };
 
   const getNextStrategyDate = () => {
@@ -214,6 +249,8 @@ export const Dashboard = () => {
     return `${mins}m`;
   };
 
+  const weeklyTime = getWeeklyTimeData();
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -223,7 +260,7 @@ export const Dashboard = () => {
       </div>
 
       {/* Quick Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <Card>
           <CardHeader>
             <CardTitle className="text-sm font-medium">Total Projects</CardTitle>
@@ -236,31 +273,21 @@ export const Dashboard = () => {
 
         <Card>
           <CardHeader>
-            <CardTitle className="text-sm font-medium">Weekly Focus Score</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-blue-600">8.2</div>
-            <p className="text-sm text-slate-500">Based on time allocation and goals</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-sm font-medium">Tasks Completed</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-green-600">18</div>
-            <p className="text-sm text-slate-500">This week's accomplishments</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
             <CardTitle className="text-sm font-medium">Time Invested</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-purple-600">45h 30m</div>
-            <p className="text-sm text-slate-500">Total time on projects this week</p>
+            <div className="text-2xl font-bold text-green-600">{formatHours(weeklyTime.invested)}</div>
+            <p className="text-sm text-slate-500">This week's invested time</p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-sm font-medium">Time Spent</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-amber-600">{formatHours(weeklyTime.spent)}</div>
+            <p className="text-sm text-slate-500">This week's spent time</p>
           </CardContent>
         </Card>
       </div>
@@ -283,14 +310,6 @@ export const Dashboard = () => {
             <div className="text-sm text-slate-500">
               {getDaysUntilNextStrategy()} days until your next planning session.
             </div>
-            <Progress value={65} className="h-2 mt-2" />
-            <div className="flex justify-between text-xs text-slate-500">
-              <span>Progress towards weekly goals</span>
-              <span>65%</span>
-            </div>
-            <Button variant="secondary" className="w-full">
-              Review Strategy
-            </Button>
           </CardContent>
         </Card>
 
