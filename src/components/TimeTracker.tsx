@@ -1,566 +1,360 @@
+
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Play, Pause, Square, Timer, Target, Clock } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { Separator } from '@/components/ui/separator';
+import { Play, Pause, Square, Clock, Target, Timer, BarChart3 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { TimeTrackerSession } from './TimeTrackerSession';
 
 interface Project {
-  id: number;
+  id: string;
   name: string;
   lifeArea: string;
-  tasks: Task[];
-  investedHours?: number;
-  spentHours?: number;
-}
-
-interface Task {
-  id: number;
-  name: string;
-  completed: boolean;
-  estimatedHours: number;
-  investedHours: number;
-  spentHours: number;
+  status: string;
 }
 
 interface TimeLog {
-  project: string;
-  task?: string;
+  id: string;
+  task: string;
   duration: number;
   type: 'invested' | 'spent';
   timestamp: string;
-  projectId?: number;
-  taskId?: number;
-}
-
-interface TimerState {
-  isRunning: boolean;
-  seconds: number;
-  selectedProject: string;
-  selectedTask: string;
-  timeType: 'invested' | 'spent';
-  startTime: number;
+  project?: string;
 }
 
 export const TimeTracker = () => {
+  const { toast } = useToast();
   const [isRunning, setIsRunning] = useState(false);
-  const [seconds, setSeconds] = useState(25 * 60);
+  const [isPaused, setIsPaused] = useState(false);
+  const [timeLeft, setTimeLeft] = useState(25 * 60); // 25 minutes in seconds
+  const [currentTask, setCurrentTask] = useState('');
   const [selectedProject, setSelectedProject] = useState('');
-  const [selectedTask, setSelectedTask] = useState('');
   const [timeType, setTimeType] = useState<'invested' | 'spent'>('invested');
   const [projects, setProjects] = useState<Project[]>([]);
-  const [recentLogs, setRecentLogs] = useState<TimeLog[]>([]);
-  const { toast } = useToast();
+  const [timeLogs, setTimeLogs] = useState<TimeLog[]>([]);
+  const [customDuration, setCustomDuration] = useState(25);
 
-  console.log('TimeTracker render - selectedProject:', selectedProject, 'projects length:', projects.length);
-
-  // Load timer state from localStorage
-  const loadTimerState = () => {
-    const savedTimerState = localStorage.getItem('timerState');
-    if (savedTimerState) {
-      try {
-        const timerState: TimerState = JSON.parse(savedTimerState);
-        console.log('Loading timer state:', timerState);
-        
-        if (timerState.isRunning) {
-          // Calculate how much time has passed since the timer was saved
-          const now = Date.now();
-          const elapsedSeconds = Math.floor((now - timerState.startTime) / 1000);
-          const remainingSeconds = Math.max(0, timerState.seconds - elapsedSeconds);
-          
-          setSeconds(remainingSeconds);
-          setIsRunning(remainingSeconds > 0);
-          setSelectedProject(timerState.selectedProject);
-          setSelectedTask(timerState.selectedTask);
-          setTimeType(timerState.timeType);
-          
-          if (remainingSeconds === 0) {
-            // Timer finished while away
-            const sessionLength = 25 * 60; // or whatever the original timer was set to
-            setTimeout(() => saveTimeLog(sessionLength), 100);
-          }
-        } else {
-          setSeconds(timerState.seconds);
-          setSelectedProject(timerState.selectedProject);
-          setSelectedTask(timerState.selectedTask);
-          setTimeType(timerState.timeType);
-        }
-      } catch (error) {
-        console.error('Error loading timer state:', error);
-      }
-    }
-  };
-
-  // Save timer state to localStorage
-  const saveTimerState = () => {
-    const timerState: TimerState = {
-      isRunning,
-      seconds,
-      selectedProject,
-      selectedTask,
-      timeType,
-      startTime: Date.now()
-    };
-    localStorage.setItem('timerState', JSON.stringify(timerState));
-    console.log('Saving timer state:', timerState);
-  };
-
-  // Load projects and check for current timer task
   useEffect(() => {
-    console.log('Loading projects and recent logs...');
-    loadProjects();
-    loadRecentLogs();
-    loadTimerState();
-    
-    // Check if there's a current timer task from projects view
-    const currentTask = localStorage.getItem('currentTimerTask');
-    if (currentTask) {
-      try {
-        const taskData = JSON.parse(currentTask);
-        console.log('Found current timer task:', taskData);
-        setSelectedProject(taskData.projectId.toString());
-        setSelectedTask(taskData.taskId.toString());
-        localStorage.removeItem('currentTimerTask'); // Clear after setting
-        
-        toast({
-          title: "Timer Set",
-          description: `Ready to track time for "${taskData.taskName}"`
-        });
-      } catch (error) {
-        console.error('Error loading current task:', error);
-      }
-    }
+    loadData();
   }, []);
 
-  // Save timer state whenever it changes
   useEffect(() => {
-    saveTimerState();
-  }, [isRunning, seconds, selectedProject, selectedTask, timeType]);
+    let interval: NodeJS.Timeout;
+    
+    if (isRunning && !isPaused && timeLeft > 0) {
+      interval = setInterval(() => {
+        setTimeLeft(time => time - 1);
+      }, 1000);
+    }
+    
+    if (timeLeft === 0 && isRunning) {
+      completeSession();
+    }
+    
+    return () => clearInterval(interval);
+  }, [isRunning, isPaused, timeLeft]);
 
-  const loadProjects = () => {
-    console.log('loadProjects called');
-    const savedStrategy = localStorage.getItem('strategySession');
+  const loadData = () => {
+    // Load projects
     const savedProjects = localStorage.getItem('projects');
-    let allProjects: Project[] = [];
-    
-    // Load from saved projects first (these have tasks)
     if (savedProjects) {
-      try {
-        const projects = JSON.parse(savedProjects);
-        allProjects = [...projects];
-        console.log('Loaded saved projects:', projects);
-      } catch (error) {
-        console.error('Error loading saved projects:', error);
-      }
+      const parsedProjects = JSON.parse(savedProjects);
+      setProjects(parsedProjects.filter((p: Project) => p.status === 'active' || !p.status));
     }
 
-    // Load from strategy session (these typically don't have tasks yet)
-    if (savedStrategy) {
-      try {
-        const data = JSON.parse(savedStrategy);
-        if (data.projects) {
-          const existingNames = new Set(allProjects.map(p => p.name.toLowerCase().trim()));
-          const strategyProjects = data.projects
-            .filter((p: any) => p.name && p.name.trim() !== '')
-            .filter((p: any) => !existingNames.has(p.name.toLowerCase().trim()))
-            .map((p: any, index: number) => ({
-              id: Date.now() + index,
-              name: p.name,
-              lifeArea: p.lifeArea || 'Personal Growth',
-              tasks: [],
-              investedHours: 0,
-              spentHours: 0
-            }));
-          allProjects = [...allProjects, ...strategyProjects];
-          console.log('Added strategy projects:', strategyProjects);
-        }
-      } catch (error) {
-        console.error('Error loading strategy projects:', error);
-      }
-    }
-
-    console.log('Final projects array:', allProjects);
-    setProjects(allProjects);
-  };
-
-  const loadRecentLogs = () => {
-    const savedLogs = localStorage.getItem('timeLogs');
-    if (savedLogs) {
-      try {
-        const logs = JSON.parse(savedLogs);
-        const today = new Date().toDateString();
-        const todayLogs = logs.filter((log: TimeLog) => {
-          const logDate = new Date(log.timestamp).toDateString();
-          return logDate === today;
-        });
-        setRecentLogs(todayLogs.slice(-10)); // Show last 10 logs
-      } catch (error) {
-        console.error('Error loading time logs:', error);
-      }
+    // Load time logs
+    const savedTimeLogs = localStorage.getItem('timeLogs');
+    if (savedTimeLogs) {
+      setTimeLogs(JSON.parse(savedTimeLogs));
     }
   };
 
-  const saveTimeLog = (duration: number) => {
-    const project = projects.find(p => p.id.toString() === selectedProject);
-    const task = project?.tasks.find(t => t.id.toString() === selectedTask);
+  const formatTime = (seconds: number) => {
+    const minutes = Math.floor(seconds / 60);
+    const remainingSeconds = seconds % 60;
+    return `${minutes.toString().padStart(2, '0')}:${remainingSeconds.toString().padStart(2, '0')}`;
+  };
+
+  const startTimer = () => {
+    if (!currentTask.trim()) {
+      toast({
+        title: "Error",
+        description: "Please enter a task name before starting the timer",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setIsRunning(true);
+    setIsPaused(false);
+    toast({
+      title: "Timer Started",
+      description: `Working on: ${currentTask}`
+    });
+  };
+
+  const pauseTimer = () => {
+    setIsPaused(true);
+    toast({
+      title: "Timer Paused",
+      description: "Timer has been paused"
+    });
+  };
+
+  const resumeTimer = () => {
+    setIsPaused(false);
+    toast({
+      title: "Timer Resumed",
+      description: "Timer has been resumed"
+    });
+  };
+
+  const stopTimer = () => {
+    if (isRunning && timeLeft < customDuration * 60) {
+      completeSession();
+    } else {
+      resetTimer();
+    }
+  };
+
+  const resetTimer = () => {
+    setIsRunning(false);
+    setIsPaused(false);
+    setTimeLeft(customDuration * 60);
+    toast({
+      title: "Timer Reset",
+      description: "Timer has been reset"
+    });
+  };
+
+  const completeSession = () => {
+    const duration = customDuration * 60 - timeLeft; // Duration in seconds
+    const durationInMinutes = Math.round(duration / 60);
     
-    if (!project) return;
+    if (durationInMinutes < 1) {
+      resetTimer();
+      return;
+    }
 
-    const timeLog: TimeLog = {
-      project: project.name,
-      task: task?.name || 'General project work',
-      duration: Math.round(duration / 60), // Convert seconds to minutes
+    const newLog: TimeLog = {
+      id: Date.now().toString(),
+      task: currentTask,
+      duration: durationInMinutes,
       type: timeType,
       timestamp: new Date().toISOString(),
-      projectId: project.id,
-      taskId: task?.id
+      project: selectedProject || undefined
     };
 
-    // Save to logs
-    const savedLogs = localStorage.getItem('timeLogs');
-    const logs = savedLogs ? JSON.parse(savedLogs) : [];
-    logs.push(timeLog);
-    localStorage.setItem('timeLogs', JSON.stringify(logs));
+    const updatedLogs = [...timeLogs, newLog];
+    setTimeLogs(updatedLogs);
+    localStorage.setItem('timeLogs', JSON.stringify(updatedLogs));
 
-    // Update project/task hours
-    if (task && project) {
-      updateTaskHours(project.id, task.id, timeLog.duration, timeType);
-    } else {
-      // Handle general project work
-      updateProjectHours(project.id, timeLog.duration, timeType);
-    }
-
-    setRecentLogs(prev => [...prev, timeLog].slice(-10));
-    
-    toast({
-      title: "Time Logged",
-      description: `${timeLog.duration} minutes ${timeType} time logged for ${project.name}${task ? ` - ${task.name}` : ''}`
-    });
-
-    // Clear timer state after logging
-    localStorage.removeItem('timerState');
-  };
-
-  const updateTaskHours = (projectId: number, taskId: number, minutes: number, type: 'invested' | 'spent') => {
-    const savedProjects = localStorage.getItem('projects');
-    if (!savedProjects) return;
-
-    try {
-      const projects = JSON.parse(savedProjects);
-      const updatedProjects = projects.map((project: any) => {
-        if (project.id === projectId) {
-          const updatedTasks = project.tasks.map((task: any) => {
-            if (task.id === taskId) {
-              const hours = minutes / 60;
-              return {
-                ...task,
-                [type === 'invested' ? 'investedHours' : 'spentHours']: 
-                  (task[type === 'invested' ? 'investedHours' : 'spentHours'] || 0) + hours
-              };
-            }
-            return task;
-          });
-          return { ...project, tasks: updatedTasks };
-        }
-        return project;
-      });
-      
-      localStorage.setItem('projects', JSON.stringify(updatedProjects));
-      loadProjects(); // Reload to get updated data
-    } catch (error) {
-      console.error('Error updating task hours:', error);
-    }
-  };
-
-  const updateProjectHours = (projectId: number, minutes: number, type: 'invested' | 'spent') => {
-    const savedProjects = localStorage.getItem('projects');
-    if (!savedProjects) return;
-
-    try {
-      const projects = JSON.parse(savedProjects);
-      const updatedProjects = projects.map((project: any) => {
-        if (project.id === projectId) {
-          const hours = minutes / 60;
+    // Update project invested hours if applicable
+    if (selectedProject && timeType === 'invested') {
+      const updatedProjects = projects.map(project => {
+        if (project.id === selectedProject) {
           return {
             ...project,
-            [type === 'invested' ? 'investedHours' : 'spentHours']: 
-              (project[type === 'invested' ? 'investedHours' : 'spentHours'] || 0) + hours
+            investedHours: (project.investedHours || 0) + (durationInMinutes / 60)
           };
         }
         return project;
       });
       
       localStorage.setItem('projects', JSON.stringify(updatedProjects));
-      loadProjects();
-    } catch (error) {
-      console.error('Error updating project hours:', error);
+      setProjects(updatedProjects.filter(p => p.status === 'active' || !p.status));
     }
-  };
 
-  useEffect(() => {
-    let interval: NodeJS.Timeout;
-    if (isRunning && seconds > 0) {
-      interval = setInterval(() => {
-        setSeconds((seconds) => seconds - 1);
-      }, 1000);
-    } else if (seconds === 0) {
-      setIsRunning(false);
-      const sessionLength = 25 * 60;
-      saveTimeLog(sessionLength);
-      
-      // Play notification sound
-      const audio = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+LvwGwyBz2Y3PLEfzMELYPL8dySQAkTYrfr5Z5PFAg+ltryy38yBC+Cy/HdjkMJEnTHmdhwOH');
-      audio.play().catch(() => console.log('Audio notification failed'));
-      
-      toast({
-        title: "Time's Up!",
-        description: "Your Pomodoro session has ended",
-      });
-    }
-    return () => clearInterval(interval);
-  }, [isRunning, seconds]);
+    toast({
+      title: "Session Completed!",
+      description: `Logged ${durationInMinutes} minutes of ${timeType} time for: ${currentTask}`
+    });
 
-  const formatTime = (seconds: number) => {
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
-  };
-
-  const startTimer = () => {
-    if (selectedProject) {
-      setIsRunning(true);
-    } else {
-      toast({
-        title: "Select Project",
-        description: "Please select a project before starting the timer",
-        variant: "destructive"
-      });
-    }
-  };
-
-  const pauseTimer = () => {
+    // Reset for next session
     setIsRunning(false);
+    setIsPaused(false);
+    setTimeLeft(customDuration * 60);
+    setCurrentTask('');
+    setSelectedProject('');
   };
 
-  const stopTimer = () => {
-    if (isRunning || seconds < 25 * 60) {
-      const elapsed = (25 * 60) - seconds;
-      if (elapsed > 60) { // Only log if more than 1 minute
-        saveTimeLog(elapsed);
-      }
+  const setCustomTime = (minutes: number) => {
+    if (!isRunning) {
+      setCustomDuration(minutes);
+      setTimeLeft(minutes * 60);
     }
-    setIsRunning(false);
-    setSeconds(25 * 60);
-    // Clear timer state when manually stopped
-    localStorage.removeItem('timerState');
   };
 
-  const resetTimer = (minutes: number) => {
-    setIsRunning(false);
-    setSeconds(minutes * 60);
+  const getProgressPercentage = () => {
+    return ((customDuration * 60 - timeLeft) / (customDuration * 60)) * 100;
   };
-
-  const selectedProjectData = projects.find(p => p.id.toString() === selectedProject);
-  const availableTasks = selectedProjectData?.tasks || [];
-
-  // Handle project change - clear task when project changes
-  const handleProjectChange = (projectId: string) => {
-    console.log('handleProjectChange called with:', projectId);
-    setSelectedProject(projectId);
-    setSelectedTask(''); // Clear task when project changes
-  };
-
-  const handleTaskChange = (taskId: string) => {
-    console.log('handleTaskChange called with:', taskId);
-    setSelectedTask(taskId);
-  };
-
-  console.log('About to render, selectedProjectData:', selectedProjectData);
 
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-bold text-slate-800 mb-2">Time Tracker</h1>
-        <p className="text-slate-600">Pomodoro timer with invested/spent tracking</p>
+        <h1 className="text-3xl font-bold text-slate-800 mb-2">Pomodoro Timer</h1>
+        <p className="text-slate-600">Track your time with focused work sessions</p>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Timer */}
-        <Card>
+        {/* Timer Card */}
+        <Card className="lg:col-span-1">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <Timer className="h-5 w-5" />
-              Pomodoro Timer
-              {isRunning && <Badge variant="default" className="ml-2">Running</Badge>}
+              <Clock className="h-5 w-5" />
+              Timer
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-6">
+            {/* Timer Display */}
             <div className="text-center">
-              <div className="text-6xl font-mono font-bold text-slate-800 mb-4">
-                {formatTime(seconds)}
+              <div className="text-6xl font-bold text-slate-800 mb-4">
+                {formatTime(timeLeft)}
               </div>
-              <div className="flex justify-center gap-2 mb-4">
-                <Button size="sm" variant="outline" onClick={() => resetTimer(25)}>
-                  25min
-                </Button>
-                <Button size="sm" variant="outline" onClick={() => resetTimer(15)}>
-                  15min
-                </Button>
-                <Button size="sm" variant="outline" onClick={() => resetTimer(5)}>
-                  5min
-                </Button>
+              <div className="w-full bg-slate-200 rounded-full h-2 mb-4">
+                <div 
+                  className="bg-blue-600 h-2 rounded-full transition-all duration-1000 ease-linear"
+                  style={{ width: `${getProgressPercentage()}%` }}
+                />
               </div>
             </div>
 
+            {/* Time Presets */}
+            {!isRunning && (
+              <div className="flex gap-2 justify-center">
+                <Button 
+                  variant={customDuration === 15 ? "default" : "outline"} 
+                  size="sm"
+                  onClick={() => setCustomTime(15)}
+                >
+                  15m
+                </Button>
+                <Button 
+                  variant={customDuration === 25 ? "default" : "outline"} 
+                  size="sm"
+                  onClick={() => setCustomTime(25)}
+                >
+                  25m
+                </Button>
+                <Button 
+                  variant={customDuration === 45 ? "default" : "outline"} 
+                  size="sm"
+                  onClick={() => setCustomTime(45)}
+                >
+                  45m
+                </Button>
+                <Button 
+                  variant={customDuration === 60 ? "default" : "outline"} 
+                  size="sm"
+                  onClick={() => setCustomTime(60)}
+                >
+                  60m
+                </Button>
+              </div>
+            )}
+
+            {/* Task Input */}
             <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium mb-2">Project</label>
-                <Select value={selectedProject} onValueChange={handleProjectChange}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select a project..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {projects.map((project) => (
-                      <SelectItem key={project.id} value={project.id.toString()}>
-                        {project.name} ({project.lifeArea})
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+              <Input
+                placeholder="What are you working on?"
+                value={currentTask}
+                onChange={(e) => setCurrentTask(e.target.value)}
+                disabled={isRunning}
+              />
 
-              {selectedProjectData && (
-                <div>
-                  <label className="block text-sm font-medium mb-2">Task</label>
-                  <Select value={selectedTask} onValueChange={handleTaskChange}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select a task (optional)..." />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="general">General project work</SelectItem>
-                      {availableTasks.map((task) => (
-                        <SelectItem key={task.id} value={task.id.toString()}>
-                          {task.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              )}
+              <Select value={selectedProject} onValueChange={setSelectedProject} disabled={isRunning}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select project (optional)" />
+                </SelectTrigger>
+                <SelectContent>
+                  {projects.map(project => (
+                    <SelectItem key={project.id} value={project.id}>
+                      {project.name} - {project.lifeArea}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
 
-              <div>
-                <label className="block text-sm font-medium mb-2">Time Type</label>
-                <div className="flex gap-2">
-                  <Button
-                    variant={timeType === 'invested' ? 'default' : 'outline'}
-                    onClick={() => setTimeType('invested')}
-                    className="flex-1"
-                  >
-                    <Target className="h-4 w-4 mr-2" />
-                    Invested
-                  </Button>
-                  <Button
-                    variant={timeType === 'spent' ? 'default' : 'outline'}
-                    onClick={() => setTimeType('spent')}
-                    className="flex-1"
-                  >
-                    <Clock className="h-4 w-4 mr-2" />
-                    Spent
-                  </Button>
-                </div>
-              </div>
+              <Select value={timeType} onValueChange={(value: 'invested' | 'spent') => setTimeType(value)} disabled={isRunning}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="invested">
+                    <div className="flex items-center gap-2">
+                      <Target className="h-4 w-4 text-green-500" />
+                      Invested Time
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="spent">
+                    <div className="flex items-center gap-2">
+                      <Timer className="h-4 w-4 text-amber-500" />
+                      Spent Time
+                    </div>
+                  </SelectItem>
+                </SelectContent>
+              </Select>
             </div>
 
-            <div className="flex gap-2">
+            {/* Timer Controls */}
+            <div className="flex gap-2 justify-center">
               {!isRunning ? (
-                <Button onClick={startTimer} disabled={!selectedProject} className="flex-1">
-                  <Play className="h-4 w-4 mr-2" />
+                <Button onClick={startTimer} className="flex items-center gap-2">
+                  <Play className="h-4 w-4" />
                   Start
                 </Button>
               ) : (
-                <Button onClick={pauseTimer} variant="secondary" className="flex-1">
-                  <Pause className="h-4 w-4 mr-2" />
-                  Pause
-                </Button>
-              )}
-              <Button onClick={stopTimer} variant="outline">
-                <Square className="h-4 w-4 mr-2" />
-                Stop
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Recent Logs */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Today's Sessions</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              {recentLogs.length === 0 ? (
-                <p className="text-slate-500 text-center py-4">No sessions logged today</p>
-              ) : (
-                recentLogs.map((log, index) => (
-                  <div key={`${log.timestamp}-${index}`} className="flex justify-between items-center p-3 bg-slate-50 rounded-lg">
-                    <div>
-                      <div className="font-medium">{log.project}</div>
-                      {log.task && <div className="text-sm text-slate-600">{log.task}</div>}
-                      <div className="text-sm text-slate-500">
-                        {new Date(log.timestamp).toLocaleTimeString()}
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <span className="font-mono font-medium">{log.duration}min</span>
-                      <Badge variant={log.type === 'invested' ? 'default' : 'secondary'}>
-                        {log.type}
-                      </Badge>
-                    </div>
-                  </div>
-                ))
+                <>
+                  {!isPaused ? (
+                    <Button onClick={pauseTimer} variant="outline" className="flex items-center gap-2">
+                      <Pause className="h-4 w-4" />
+                      Pause
+                    </Button>
+                  ) : (
+                    <Button onClick={resumeTimer} className="flex items-center gap-2">
+                      <Play className="h-4 w-4" />
+                      Resume
+                    </Button>
+                  )}
+                  <Button onClick={stopTimer} variant="outline" className="flex items-center gap-2">
+                    <Square className="h-4 w-4" />
+                    Stop
+                  </Button>
+                </>
               )}
             </div>
-          </CardContent>
-        </Card>
-      </div>
 
-      {/* Weekly Summary */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Weekly Time Summary</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {projects.slice(0, 6).map((project) => {
-              // Calculate totals from both tasks and direct project time
-              const taskInvested = project.tasks?.reduce((sum, task) => sum + (task.investedHours || 0), 0) || 0;
-              const taskSpent = project.tasks?.reduce((sum, task) => sum + (task.spentHours || 0), 0) || 0;
-              const projectInvested = project.investedHours || 0;
-              const projectSpent = project.spentHours || 0;
-              const totalInvested = taskInvested + projectInvested;
-              const totalSpent = taskSpent + projectSpent;
-              
-              return (
-                <div key={project.id} className="p-4 border border-slate-200 rounded-lg">
-                  <div className="font-medium mb-2">{project.name}</div>
-                  <div className="text-sm text-slate-500 mb-3">{project.lifeArea}</div>
-                  <div className="space-y-1">
-                    <div className="flex justify-between">
-                      <span className="text-sm">Invested:</span>
-                      <span className="font-mono text-green-600">{totalInvested.toFixed(1)}h</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-sm">Spent:</span>
-                      <span className="font-mono text-amber-600">{totalSpent.toFixed(1)}h</span>
-                    </div>
+            {/* Current Session Info */}
+            {isRunning && (
+              <div className="bg-blue-50 p-4 rounded-lg">
+                <div className="text-sm text-blue-600 mb-1">Current Session</div>
+                <div className="font-medium text-blue-800">{currentTask}</div>
+                {selectedProject && (
+                  <div className="text-sm text-blue-600">
+                    Project: {projects.find(p => p.id === selectedProject)?.name}
                   </div>
+                )}
+                <div className="flex items-center gap-2 mt-2">
+                  <Badge variant={timeType === 'invested' ? 'default' : 'secondary'} 
+                         className={timeType === 'invested' ? 'bg-green-100 text-green-800' : 'bg-amber-100 text-amber-800'}>
+                    {timeType === 'invested' ? 'Invested' : 'Spent'} Time
+                  </Badge>
                 </div>
-              );
-            })}
-          </div>
-        </CardContent>
-      </Card>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Today's Sessions */}
+        <div className="lg:col-span-1">
+          <TimeTrackerSession timeLogs={timeLogs} />
+        </div>
+      </div>
     </div>
   );
 };
+

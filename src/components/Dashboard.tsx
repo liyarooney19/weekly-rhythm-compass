@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -14,6 +15,7 @@ export const Dashboard = () => {
   const [leisureActivities, setLeisureActivities] = useState<any[]>([]);
   const [timeLogs, setTimeLogs] = useState<any[]>([]);
   const [strategyDay, setStrategyDay] = useState('Sunday');
+  const [currentSession, setCurrentSession] = useState<any>(null);
 
   useEffect(() => {
     loadData();
@@ -24,22 +26,24 @@ export const Dashboard = () => {
     const savedProjects = localStorage.getItem('projects');
     setProjects(savedProjects ? JSON.parse(savedProjects) : []);
 
-    // Load reading items
     const savedReadingItems = localStorage.getItem('readingItems');
     setReadingItems(savedReadingItems ? JSON.parse(savedReadingItems) : []);
 
-    // Load leisure activities
     const savedLeisureActivities = localStorage.getItem('leisureActivities');
     setLeisureActivities(savedLeisureActivities ? JSON.parse(savedLeisureActivities) : []);
 
-    // Load time logs
     const savedTimeLogs = localStorage.getItem('timeLogs');
     setTimeLogs(savedTimeLogs ? JSON.parse(savedTimeLogs) : []);
 
-    // Load strategy day
-    const savedStrategyDay = localStorage.getItem('weeklyStrategyDay');
+    // Load strategy session data
+    const savedStrategyDay = localStorage.getItem('strategyDay') || localStorage.getItem('weeklyStrategyDay');
     if (savedStrategyDay) {
       setStrategyDay(savedStrategyDay);
+    }
+
+    const savedCurrentSession = localStorage.getItem('currentStrategySession');
+    if (savedCurrentSession) {
+      setCurrentSession(JSON.parse(savedCurrentSession));
     }
   };
 
@@ -55,13 +59,15 @@ export const Dashboard = () => {
     localStorage.removeItem('readingItems');
     localStorage.removeItem('weeklyStrategyDay');
     localStorage.removeItem('weeklyStrategyHistory');
+    localStorage.removeItem('strategyDay');
+    localStorage.removeItem('currentStrategySession');
+    localStorage.removeItem('weeklyStrategyAgenda');
     
     toast({
       title: "Success",
       description: "All data has been reset. You can now start fresh!"
     });
     
-    // Reload the page to reflect changes
     window.location.reload();
   };
 
@@ -96,7 +102,7 @@ export const Dashboard = () => {
   // Get active projects with progress - show ALL active projects, not just 3
   const getActiveProjects = () => {
     return projects
-      .filter(project => project.status === 'active' || !project.status) // Include projects without status for backward compatibility
+      .filter(project => project.status === 'active' || !project.status)
       .map(project => ({
         name: project.name,
         hours: Math.round(project.investedHours || 0),
@@ -108,13 +114,13 @@ export const Dashboard = () => {
   const activeProjects = getActiveProjects();
   const activeProjectsCount = projects.filter(project => project.status === 'active' || !project.status).length;
 
-  // Check if strategy session is due
+  // Updated strategy session logic
   const isStrategySessionDue = () => {
     const today = new Date();
     const dayIndex = today.getDay();
     const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
     const targetDayIndex = days.indexOf(strategyDay);
-    return dayIndex === targetDayIndex;
+    return dayIndex === targetDayIndex && !currentSession;
   };
 
   const getNextStrategyDate = () => {
@@ -128,6 +134,32 @@ export const Dashboard = () => {
     return nextSession.toLocaleDateString();
   };
 
+  const getStrategySessionStatus = () => {
+    if (currentSession) {
+      return {
+        status: 'in-progress',
+        text: `Session in progress (${currentSession.date})`,
+        color: 'bg-blue-50 border-blue-200 text-blue-800'
+      };
+    }
+    
+    if (isStrategySessionDue()) {
+      return {
+        status: 'due',
+        text: `Your weekly strategy session is due today (${strategyDay})!`,
+        color: 'bg-green-50 border-green-200 text-green-800'
+      };
+    }
+    
+    return {
+      status: 'scheduled',
+      text: `Next session scheduled for ${getNextStrategyDate()} (${strategyDay})`,
+      color: 'bg-slate-50 border-slate-200 text-slate-800'
+    };
+  };
+
+  const sessionStatus = getStrategySessionStatus();
+
   return (
     <div className="space-y-6">
       <div>
@@ -136,20 +168,18 @@ export const Dashboard = () => {
       </div>
 
       {/* Strategy Session Status */}
-      <Card className={isStrategySessionDue() ? "border-green-200 bg-green-50" : "border-blue-200 bg-blue-50"}>
+      <Card className={sessionStatus.color}>
         <CardHeader>
-          <CardTitle className={`flex items-center gap-2 ${isStrategySessionDue() ? "text-green-800" : "text-blue-800"}`}>
+          <CardTitle className={`flex items-center gap-2 ${sessionStatus.color.includes('text-') ? '' : 'text-slate-800'}`}>
             <Settings className="h-5 w-5" />
             Weekly Strategy Session
-            {isStrategySessionDue() && <Badge className="bg-green-600">Due Today</Badge>}
+            {sessionStatus.status === 'due' && <Badge className="bg-green-600">Due Today</Badge>}
+            {sessionStatus.status === 'in-progress' && <Badge className="bg-blue-600">In Progress</Badge>}
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <p className={isStrategySessionDue() ? "text-green-700" : "text-blue-700"}>
-            {isStrategySessionDue() 
-              ? `Your weekly strategy session is due today (${strategyDay})!`
-              : `Next session scheduled for ${getNextStrategyDate()} (${strategyDay})`
-            }
+          <p className={sessionStatus.color.includes('text-') ? '' : 'text-slate-700'}>
+            {sessionStatus.text}
           </p>
         </CardContent>
       </Card>
@@ -201,24 +231,35 @@ export const Dashboard = () => {
         </Card>
       </div>
 
-      {/* Project Progress - Show all active projects */}
+      {/* Enhanced Active Projects Display */}
       {activeProjects.length > 0 && (
         <Card>
           <CardHeader>
             <CardTitle>Active Projects ({activeProjects.length})</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {activeProjects.map((project, index) => (
-                <div key={index} className="space-y-2">
-                  <div className="flex justify-between items-center">
-                    <div className="flex items-center gap-2">
-                      <span className="font-medium">{project.name}</span>
-                      <Badge variant="secondary">{project.category}</Badge>
+                <div key={index} className="bg-gradient-to-br from-white to-slate-50 border border-slate-200 rounded-lg p-4 hover:shadow-md transition-shadow">
+                  <div className="flex items-start justify-between mb-3">
+                    <div className="flex-1">
+                      <h3 className="font-semibold text-slate-800 mb-1 line-clamp-2">{project.name}</h3>
+                      <Badge variant="secondary" className="text-xs">{project.category}</Badge>
                     </div>
-                    <span className="text-sm text-slate-500">{project.hours}h</span>
                   </div>
-                  <Progress value={project.progress} className="h-2" />
+                  
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-slate-600">Progress</span>
+                      <span className="font-medium text-slate-800">{project.progress}%</span>
+                    </div>
+                    <Progress value={project.progress} className="h-2" />
+                    
+                    <div className="flex items-center justify-between text-sm pt-2">
+                      <span className="text-slate-600">Time invested</span>
+                      <span className="font-medium text-green-600">{project.hours}h</span>
+                    </div>
+                  </div>
                 </div>
               ))}
             </div>
@@ -277,7 +318,6 @@ export const Dashboard = () => {
         </Card>
       </div>
 
-      {/* Getting Started Message */}
       {projects.length === 0 && readingItems.length === 0 && leisureActivities.length === 0 && (
         <Card className="border-blue-200 bg-blue-50">
           <CardHeader>
@@ -336,7 +376,6 @@ export const Dashboard = () => {
         </Card>
       )}
 
-      {/* Reset Data Section */}
       <div className="pt-8 border-t border-slate-200">
         <div className="flex justify-end">
           <AlertDialog>
@@ -372,3 +411,4 @@ export const Dashboard = () => {
     </div>
   );
 };
+
