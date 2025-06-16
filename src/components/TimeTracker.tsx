@@ -34,6 +34,15 @@ interface TimeLog {
   taskId?: number;
 }
 
+interface TimerState {
+  isRunning: boolean;
+  seconds: number;
+  selectedProject: string;
+  selectedTask: string;
+  timeType: 'invested' | 'spent';
+  startTime: number;
+}
+
 export const TimeTracker = () => {
   const [isRunning, setIsRunning] = useState(false);
   const [seconds, setSeconds] = useState(25 * 60);
@@ -46,11 +55,63 @@ export const TimeTracker = () => {
 
   console.log('TimeTracker render - selectedProject:', selectedProject, 'projects length:', projects.length);
 
+  // Load timer state from localStorage
+  const loadTimerState = () => {
+    const savedTimerState = localStorage.getItem('timerState');
+    if (savedTimerState) {
+      try {
+        const timerState: TimerState = JSON.parse(savedTimerState);
+        console.log('Loading timer state:', timerState);
+        
+        if (timerState.isRunning) {
+          // Calculate how much time has passed since the timer was saved
+          const now = Date.now();
+          const elapsedSeconds = Math.floor((now - timerState.startTime) / 1000);
+          const remainingSeconds = Math.max(0, timerState.seconds - elapsedSeconds);
+          
+          setSeconds(remainingSeconds);
+          setIsRunning(remainingSeconds > 0);
+          setSelectedProject(timerState.selectedProject);
+          setSelectedTask(timerState.selectedTask);
+          setTimeType(timerState.timeType);
+          
+          if (remainingSeconds === 0) {
+            // Timer finished while away
+            const sessionLength = 25 * 60; // or whatever the original timer was set to
+            setTimeout(() => saveTimeLog(sessionLength), 100);
+          }
+        } else {
+          setSeconds(timerState.seconds);
+          setSelectedProject(timerState.selectedProject);
+          setSelectedTask(timerState.selectedTask);
+          setTimeType(timerState.timeType);
+        }
+      } catch (error) {
+        console.error('Error loading timer state:', error);
+      }
+    }
+  };
+
+  // Save timer state to localStorage
+  const saveTimerState = () => {
+    const timerState: TimerState = {
+      isRunning,
+      seconds,
+      selectedProject,
+      selectedTask,
+      timeType,
+      startTime: Date.now()
+    };
+    localStorage.setItem('timerState', JSON.stringify(timerState));
+    console.log('Saving timer state:', timerState);
+  };
+
   // Load projects and check for current timer task
   useEffect(() => {
     console.log('Loading projects and recent logs...');
     loadProjects();
     loadRecentLogs();
+    loadTimerState();
     
     // Check if there's a current timer task from projects view
     const currentTask = localStorage.getItem('currentTimerTask');
@@ -71,6 +132,11 @@ export const TimeTracker = () => {
       }
     }
   }, []);
+
+  // Save timer state whenever it changes
+  useEffect(() => {
+    saveTimerState();
+  }, [isRunning, seconds, selectedProject, selectedTask, timeType]);
 
   const loadProjects = () => {
     console.log('loadProjects called');
@@ -171,6 +237,9 @@ export const TimeTracker = () => {
       title: "Time Logged",
       description: `${timeLog.duration} minutes ${timeType} time logged for ${project.name}${task ? ` - ${task.name}` : ''}`
     });
+
+    // Clear timer state after logging
+    localStorage.removeItem('timerState');
   };
 
   const updateTaskHours = (projectId: number, taskId: number, minutes: number, type: 'invested' | 'spent') => {
@@ -283,6 +352,8 @@ export const TimeTracker = () => {
     }
     setIsRunning(false);
     setSeconds(25 * 60);
+    // Clear timer state when manually stopped
+    localStorage.removeItem('timerState');
   };
 
   const resetTimer = (minutes: number) => {
@@ -321,6 +392,7 @@ export const TimeTracker = () => {
             <CardTitle className="flex items-center gap-2">
               <Timer className="h-5 w-5" />
               Pomodoro Timer
+              {isRunning && <Badge variant="default" className="ml-2">Running</Badge>}
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-6">
