@@ -1,468 +1,272 @@
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
-import { Timer, Target, BookOpen, FileText, Gamepad2, Calendar, Trash2, Settings, FolderOpen, Clock } from 'lucide-react';
+import { Calendar, Clock, Target, BookOpen, PenTool, Brain, Users, Heart, Coffee, CheckCircle2, AlertCircle, CalendarDays, TrendingUp } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { ActiveProjectsList } from './ActiveProjectsList';
+
+interface Project {
+  id: string;
+  name: string;
+  lifeArea: string;
+  status: string;
+  investedHours?: number;
+  spentHours?: number;
+  tasks: Task[];
+}
+
+interface Task {
+  id: number;
+  name: string;
+  completed: boolean;
+  estimatedHours: number;
+  investedHours: number;
+  spentHours: number;
+}
+
+interface TimeLog {
+  id: string;
+  task: string;
+  duration: number;
+  type: 'invested' | 'spent';
+  timestamp: string;
+  project?: string;
+}
+
+interface StrategySession {
+  date: string;
+  projects: any[];
+  reflection: string;
+}
 
 export const Dashboard = () => {
   const { toast } = useToast();
-  const [projects, setProjects] = useState<any[]>([]);
-  const [readingItems, setReadingItems] = useState<any[]>([]);
-  const [leisureActivities, setLeisureActivities] = useState<any[]>([]);
-  const [timeLogs, setTimeLogs] = useState<any[]>([]);
-  const [strategyDay, setStrategyDay] = useState('Sunday');
-  const [currentSession, setCurrentSession] = useState<any>(null);
-  const [sessionHistory, setSessionHistory] = useState<any[]>([]);
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [strategySession, setStrategySession] = useState<StrategySession | null>(null);
 
   useEffect(() => {
     loadData();
   }, []);
 
   const loadData = () => {
-    // Load projects
     const savedProjects = localStorage.getItem('projects');
-    setProjects(savedProjects ? JSON.parse(savedProjects) : []);
-
-    const savedReadingItems = localStorage.getItem('readingItems');
-    setReadingItems(savedReadingItems ? JSON.parse(savedReadingItems) : []);
-
-    const savedLeisureActivities = localStorage.getItem('leisureActivities');
-    setLeisureActivities(savedLeisureActivities ? JSON.parse(savedLeisureActivities) : []);
-
-    const savedTimeLogs = localStorage.getItem('timeLogs');
-    setTimeLogs(savedTimeLogs ? JSON.parse(savedTimeLogs) : []);
-
-    // Load strategy session data
-    const savedStrategyDay = localStorage.getItem('strategyDay') || localStorage.getItem('weeklyStrategyDay');
-    if (savedStrategyDay) {
-      setStrategyDay(savedStrategyDay);
+    if (savedProjects) {
+      setProjects(JSON.parse(savedProjects));
     }
 
-    const savedCurrentSession = localStorage.getItem('currentStrategySession');
-    if (savedCurrentSession) {
-      setCurrentSession(JSON.parse(savedCurrentSession));
-    }
-
-    // Load session history
-    const savedHistory = localStorage.getItem('strategySessionHistory');
-    if (savedHistory) {
-      setSessionHistory(JSON.parse(savedHistory));
+    const savedStrategy = localStorage.getItem('strategySession');
+    if (savedStrategy) {
+      setStrategySession(JSON.parse(savedStrategy));
     }
   };
 
-  const resetAllData = () => {
-    // Clear all localStorage data
-    localStorage.removeItem('strategySession');
-    localStorage.removeItem('projects');
-    localStorage.removeItem('timeLogs');
-    localStorage.removeItem('weeklyTasks');
-    localStorage.removeItem('leisureActivities');
-    localStorage.removeItem('writingNotes');
-    localStorage.removeItem('readingList');
-    localStorage.removeItem('readingItems');
-    localStorage.removeItem('weeklyStrategyDay');
-    localStorage.removeItem('weeklyStrategyHistory');
-    localStorage.removeItem('strategyDay');
-    localStorage.removeItem('currentStrategySession');
-    localStorage.removeItem('weeklyStrategyAgenda');
-    localStorage.removeItem('strategySessionHistory');
-    
-    toast({
-      title: "Success",
-      description: "All data has been reset. You can now start fresh!"
-    });
-    
-    window.location.reload();
-  };
-
-  // Calculate weekly progress from actual data
-  const calculateWeeklyProgress = () => {
-    const oneWeekAgo = new Date();
-    oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
-    
-    const weeklyLogs = timeLogs.filter(log => 
-      new Date(log.timestamp) >= oneWeekAgo
-    );
-    
-    const totalHours = weeklyLogs.reduce((sum, log) => sum + (log.duration / 60), 0);
-    const investedHours = weeklyLogs
-      .filter(log => log.type === 'invested')
-      .reduce((sum, log) => sum + (log.duration / 60), 0);
-    const spentHours = weeklyLogs
-      .filter(log => log.type === 'spent')
-      .reduce((sum, log) => sum + (log.duration / 60), 0);
-
-    return {
-      totalHours: Math.round(totalHours).toString(),
-      investedHours: Math.round(investedHours).toString(),
-      spentHours: Math.round(spentHours).toString(),
-      investedPercentage: totalHours > 0 ? Math.round((investedHours / totalHours) * 100) : 0,
-      spentPercentage: totalHours > 0 ? Math.round((spentHours / totalHours) * 100) : 0
-    };
-  };
-
-  const weeklyProgress = calculateWeeklyProgress();
-
-  // Get active projects with progress - show ALL active projects, not just 3
-  const getActiveProjects = () => {
-    return projects
-      .filter(project => project.status === 'active' || !project.status)
-      .map(project => ({
-        name: project.name,
-        hours: Math.round(project.investedHours || 0),
-        category: project.lifeArea || 'General',
-        progress: project.progress || 0
-      }));
-  };
-
-  const activeProjects = getActiveProjects();
-  const activeProjectsCount = projects.filter(project => project.status === 'active' || !project.status).length;
-
-  // Updated strategy session logic with proper next date calculation
-  const getLastCompletedSessionDate = () => {
-    if (sessionHistory.length === 0) return null;
-    const sortedHistory = sessionHistory
-      .filter(session => session.completed)
-      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-    return sortedHistory.length > 0 ? new Date(sortedHistory[0].date) : null;
-  };
-
-  const isStrategySessionDue = () => {
-    if (currentSession) return false;
-    
-    const today = new Date();
-    const dayIndex = today.getDay();
-    const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-    const targetDayIndex = days.indexOf(strategyDay);
-    
-    // If today is the strategy day
-    if (dayIndex === targetDayIndex) {
-      const lastCompleted = getLastCompletedSessionDate();
-      if (!lastCompleted) return true; // No sessions completed yet
-      
-      // Check if last session was completed before today
-      const todayStart = new Date(today);
-      todayStart.setHours(0, 0, 0, 0);
-      return lastCompleted < todayStart;
-    }
-    
-    return false;
+  const getWeekNumber = (date: Date) => {
+    const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+    const dayNum = d.getUTCDay() || 7;
+    d.setUTCDate(d.getUTCDate() + 4 - dayNum);
+    const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+    return Math.ceil((((d.getTime() - yearStart.getTime()) / 86400000) + 1) / 7);
   };
 
   const getNextStrategyDate = () => {
+    if (!strategySession || !strategySession.date) {
+      return 'No strategy session planned.';
+    }
+
+    const sessionDate = new Date(strategySession.date);
     const today = new Date();
-    const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-    const targetDayIndex = days.indexOf(strategyDay);
     
-    const lastCompleted = getLastCompletedSessionDate();
-    
-    if (lastCompleted) {
-      // Calculate next session from last completed date
-      const nextSession = new Date(lastCompleted);
-      nextSession.setDate(lastCompleted.getDate() + 7); // Add 7 days for weekly interval
-      return nextSession.toLocaleDateString();
+    if (sessionDate >= today) {
+      return sessionDate.toLocaleDateString();
     } else {
-      // No completed sessions yet, calculate from today
-      const todayIndex = today.getDay();
-      const daysUntil = (targetDayIndex - todayIndex + 7) % 7;
-      const nextSession = new Date(today);
-      nextSession.setDate(today.getDate() + (daysUntil === 0 ? 7 : daysUntil));
-      return nextSession.toLocaleDateString();
+      return 'No upcoming strategy session.';
     }
   };
 
-  const getStrategySessionStatus = () => {
-    if (currentSession) {
-      return {
-        status: 'in-progress',
-        text: `Session in progress (${currentSession.date})`,
-        color: 'bg-blue-50 border-blue-200 text-blue-800'
-      };
+  const getDaysUntilNextStrategy = () => {
+    if (!strategySession || !strategySession.date) {
+      return 'N/A';
     }
-    
-    if (isStrategySessionDue()) {
-      return {
-        status: 'due',
-        text: `Your weekly strategy session is due today (${strategyDay})!`,
-        color: 'bg-green-50 border-green-200 text-green-800'
-      };
+
+    const sessionDate = new Date(strategySession.date);
+    const today = new Date();
+    const diffInTime = sessionDate.getTime() - today.getTime();
+    const diffInDays = Math.ceil(diffInTime / (1000 * 3600 * 24));
+
+    if (diffInDays >= 0) {
+      return diffInDays.toString();
+    } else {
+      return 'N/A';
     }
-    
-    return {
-      status: 'scheduled',
-      text: `Next session scheduled for ${getNextStrategyDate()} (${strategyDay})`,
-      color: 'bg-slate-50 border-slate-200 text-slate-800'
+  };
+
+  const getLifeAreaIcon = (area: string) => {
+    const icons: { [key: string]: any } = {
+      'Work / Career': PenTool,
+      'Personal Growth': Brain,
+      'Creative Projects': PenTool,
+      'Health & Routines': Heart,
+      'Relationships / Family': Users,
+      'Leisure/Hobby': Coffee
     };
+    return icons[area] || BookOpen;
   };
 
-  const sessionStatus = getStrategySessionStatus();
+  const getLifeAreaColor = (lifeArea: string) => {
+    const colors = {
+      'Work / Career': 'bg-purple-100 text-purple-800',
+      'Personal Growth': 'bg-blue-100 text-blue-800',
+      'Creative Projects': 'bg-orange-100 text-orange-800',
+      'Health & Routines': 'bg-red-100 text-red-800',
+      'Relationships / Family': 'bg-pink-100 text-pink-800',
+      'Leisure/Hobby': 'bg-green-100 text-green-800'
+    };
+    return colors[lifeArea as keyof typeof colors] || 'bg-slate-100 text-slate-800';
+  };
+
+  const getRecentActivity = () => {
+    const timeLogsString = localStorage.getItem('timeLogs');
+    if (!timeLogsString) return [];
+  
+    try {
+      const timeLogs = JSON.parse(timeLogsString);
+      // Sort by timestamp in descending order to get the most recent logs
+      const sortedLogs = timeLogs.sort((a: any, b: any) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+      return sortedLogs.slice(0, 5); // Get the 5 most recent logs
+    } catch (error) {
+      console.error("Error parsing timeLogs from localStorage:", error);
+      return [];
+    }
+  };
+
+  const formatTime = (minutes: number) => {
+    const hours = Math.floor(minutes / 60);
+    const mins = minutes % 60;
+    if (hours > 0) {
+      return `${hours}h ${mins}m`;
+    }
+    return `${mins}m`;
+  };
 
   return (
     <div className="space-y-6">
+      {/* Header */}
       <div>
         <h1 className="text-3xl font-bold text-slate-800 mb-2">Dashboard</h1>
-        <p className="text-slate-600">Welcome to your personal development operating system</p>
+        <p className="text-slate-600">Your productivity overview and quick actions</p>
       </div>
-
-      {/* Strategy Session Status */}
-      <Card className={sessionStatus.color}>
-        <CardHeader>
-          <CardTitle className={`flex items-center gap-2 ${sessionStatus.color.includes('text-') ? '' : 'text-slate-800'}`}>
-            <Settings className="h-5 w-5" />
-            Weekly Strategy Session
-            {sessionStatus.status === 'due' && <Badge className="bg-green-600">Due Today</Badge>}
-            {sessionStatus.status === 'in-progress' && <Badge className="bg-blue-600">In Progress</Badge>}
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <p className={sessionStatus.color.includes('text-') ? '' : 'text-slate-700'}>
-            {sessionStatus.text}
-          </p>
-        </CardContent>
-      </Card>
-
-      {/* Weekly Time Summary */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Active Projects</CardTitle>
-            <FolderOpen className="h-4 w-4 text-slate-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{activeProjectsCount}</div>
-            <p className="text-xs text-slate-500">Currently working on</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Hours</CardTitle>
-            <Timer className="h-4 w-4 text-slate-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{weeklyProgress.totalHours}h</div>
-            <p className="text-xs text-slate-500">This week</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Invested Time</CardTitle>
-            <Target className="h-4 w-4 text-green-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-green-600">{weeklyProgress.investedHours}h</div>
-            <p className="text-xs text-slate-500">{weeklyProgress.investedPercentage}% of total time</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Spent Time</CardTitle>
-            <Timer className="h-4 w-4 text-amber-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-amber-600">{weeklyProgress.spentHours}h</div>
-            <p className="text-xs text-slate-500">{weeklyProgress.spentPercentage}% of total time</p>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Beautiful Active Projects Display */}
-      {activeProjects.length > 0 && (
-        <Card className="overflow-hidden">
-          <CardHeader className="bg-gradient-to-r from-blue-50 to-indigo-50 border-b border-blue-100">
-            <CardTitle className="flex items-center gap-2 text-blue-900">
-              <FolderOpen className="h-5 w-5" />
-              Active Projects ({activeProjects.length})
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="p-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {activeProjects.map((project, index) => (
-                <div key={index} className="group relative">
-                  <div className="absolute inset-0 bg-gradient-to-br from-blue-500/10 to-purple-500/10 rounded-xl blur-sm group-hover:blur-none transition-all duration-300" />
-                  <div className="relative bg-white/80 backdrop-blur-sm border border-white/50 rounded-xl p-6 hover:shadow-lg hover:scale-105 transition-all duration-300">
-                    <div className="flex items-start justify-between mb-4">
-                      <div className="flex-1">
-                        <h3 className="font-bold text-slate-800 text-lg mb-2 line-clamp-2 leading-tight">
-                          {project.name}
-                        </h3>
-                        <Badge variant="secondary" className="text-xs font-medium bg-blue-100 text-blue-700 border-blue-200">
-                          {project.category}
-                        </Badge>
-                      </div>
-                    </div>
-                    
-                    <div className="space-y-4">
-                      <div className="space-y-2">
-                        <div className="flex items-center justify-between">
-                          <span className="text-sm font-medium text-slate-600">Progress</span>
-                          <span className="text-lg font-bold text-slate-800">{project.progress}%</span>
-                        </div>
-                        <Progress value={project.progress} className="h-3 bg-slate-100" />
-                      </div>
-                      
-                      <div className="flex items-center justify-between pt-2 border-t border-slate-100">
-                        <div className="flex items-center gap-2 text-green-600">
-                          <Clock className="h-4 w-4" />
-                          <span className="text-sm font-medium">Time invested</span>
-                        </div>
-                        <span className="text-xl font-bold text-green-600">{project.hours}h</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      )}
 
       {/* Quick Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <BookOpen className="h-5 w-5" />
-              Reading This Week
-            </CardTitle>
+            <CardTitle className="text-sm font-medium">Total Projects</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="space-y-2">
-              {readingItems.length > 0 ? (
-                <>
-                  <div className="text-lg font-semibold">{readingItems.length} items in progress</div>
-                  <div className="text-sm text-slate-500">
-                    {readingItems.filter(item => item.type === 'book').length} books, {' '}
-                    {readingItems.filter(item => item.type === 'article').length} articles, {' '}
-                    {readingItems.filter(item => item.type === 'podcast').length} podcasts
-                  </div>
-                </>
-              ) : (
-                <div className="text-lg font-semibold text-slate-500">No reading items yet</div>
-              )}
-            </div>
+            <div className="text-2xl font-bold">{projects.length}</div>
+            <p className="text-sm text-slate-500">All active and postponed projects</p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader>
+            <CardTitle className="text-sm font-medium">Weekly Focus Score</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-blue-600">8.2</div>
+            <p className="text-sm text-slate-500">Based on time allocation and goals</p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-sm font-medium">Tasks Completed</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-green-600">18</div>
+            <p className="text-sm text-slate-500">This week's accomplishments</p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-sm font-medium">Time Invested</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-purple-600">45h 30m</div>
+            <p className="text-sm text-slate-500">Total time on projects this week</p>
+          </CardContent>
+        </Card>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Weekly Strategy Session */}
+        <Card>
+          <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <Gamepad2 className="h-5 w-5" />
-              Leisure Activities
+              <CalendarDays className="h-5 w-5" />
+              Weekly Strategy Session
             </CardTitle>
           </CardHeader>
-          <CardContent>
-            <div className="space-y-2">
-              {leisureActivities.length > 0 ? (
-                <>
-                  <div className="text-lg font-semibold">{leisureActivities.length} active activities</div>
-                  <div className="text-sm text-slate-500">
-                    {leisureActivities.reduce((sum, activity) => sum + activity.totalHours, 0).toFixed(1)} hours total
-                  </div>
-                </>
-              ) : (
-                <div className="text-lg font-semibold text-slate-500">No leisure activities yet</div>
-              )}
+          <CardContent className="space-y-4">
+            <div className="flex items-center gap-2">
+              <TrendingUp className="h-4 w-4 text-blue-500" />
+              <span className="text-sm font-medium">Next Session:</span>
             </div>
+            <div className="text-xl font-bold text-slate-800">{getNextStrategyDate()}</div>
+            <div className="text-sm text-slate-500">
+              {getDaysUntilNextStrategy()} days until your next planning session.
+            </div>
+            <Progress value={65} className="h-2 mt-2" />
+            <div className="flex justify-between text-xs text-slate-500">
+              <span>Progress towards weekly goals</span>
+              <span>65%</span>
+            </div>
+            <Button variant="secondary" className="w-full">
+              Review Strategy
+            </Button>
           </CardContent>
         </Card>
+
+        {/* Active Projects */}
+        <ActiveProjectsList />
       </div>
 
-      {projects.length === 0 && readingItems.length === 0 && leisureActivities.length === 0 && (
-        <Card className="border-blue-200 bg-blue-50">
-          <CardHeader>
-            <CardTitle className="text-blue-800 text-2xl">👋 Welcome to SelfDev OS</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-blue-700 mb-6 text-lg">
-              Your space to think clearly, act deliberately, and grow on purpose.
-            </p>
-            <div className="space-y-4">
-              <h3 className="text-blue-800 font-semibold text-lg">Let's get you started:</h3>
-              
-              <div className="space-y-4 text-blue-700">
-                <div className="flex gap-3">
-                  <span className="font-semibold text-blue-800">1.</span>
-                  <div>
-                    <div className="font-semibold">Start with a Strategy Session</div>
-                    <div className="text-sm">Define key dissatisfactions, turn them into projects, and set your direction.</div>
-                  </div>
-                </div>
-                
-                <div className="flex gap-3">
-                  <span className="font-semibold text-blue-800">2.</span>
-                  <div>
-                    <div className="font-semibold">Create Your Projects</div>
-                    <div className="text-sm">Capture areas like work, health, learning, or creativity. Break them into tasks and set time goals.</div>
-                  </div>
-                </div>
-                
-                <div className="flex gap-3">
-                  <span className="font-semibold text-blue-800">3.</span>
-                  <div>
-                    <div className="font-semibold">Track Your Time</div>
-                    <div className="text-sm">Use the Pomodoro timer to log time as Invested or Spent. See where your energy is going.</div>
-                  </div>
-                </div>
-                
-                <div className="flex gap-3">
-                  <span className="font-semibold text-blue-800">4.</span>
-                  <div>
-                    <div className="font-semibold">Plan and Reflect Weekly</div>
-                    <div className="text-sm">Run a strategy session each week to review progress, refine projects, and plan your next steps.</div>
-                  </div>
-                </div>
-                
-                <div className="flex gap-3">
-                  <span className="font-semibold text-blue-800">5.</span>
-                  <div>
-                    <div className="font-semibold">Log What You're Learning and Enjoying</div>
-                    <div className="text-sm">Add books, podcasts, or blogs to your reading list. Track leisure activities that recharge you.</div>
-                  </div>
-                </div>
-              </div>
+      {/* Recent Activity */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Clock className="h-5 w-5" />
+            Recent Activity
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {getRecentActivity().length === 0 ? (
+            <div className="text-center py-8 text-slate-500">
+              <AlertCircle className="h-10 w-10 mx-auto mb-2 text-slate-400" />
+              <p>No recent activity found.</p>
             </div>
-          </CardContent>
-        </Card>
-      )}
-
-      <div className="pt-8 border-t border-slate-200">
-        <div className="flex justify-end">
-          <AlertDialog>
-            <AlertDialogTrigger asChild>
-              <Button variant="ghost" size="sm" className="text-slate-500 hover:text-red-600">
-                <Trash2 className="h-4 w-4 mr-2" />
-                Reset all data
-              </Button>
-            </AlertDialogTrigger>
-            <AlertDialogContent>
-              <AlertDialogHeader>
-                <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
-                <AlertDialogDescription>
-                  This action cannot be undone. This will permanently delete all your:
-                  <br />• Projects and tasks
-                  <br />• Time tracking logs
-                  <br />• Notes and reading list
-                  <br />• Strategy session data
-                  <br />• Weekly planning data
-                  <br />• Leisure activities
-                </AlertDialogDescription>
-              </AlertDialogHeader>
-              <AlertDialogFooter>
-                <AlertDialogCancel>Cancel</AlertDialogCancel>
-                <AlertDialogAction onClick={resetAllData} className="bg-red-600 hover:bg-red-700">
-                  Yes, reset everything
-                </AlertDialogAction>
-              </AlertDialogFooter>
-            </AlertDialogContent>
-          </AlertDialog>
-        </div>
-      </div>
+          ) : (
+            <ul className="space-y-2">
+              {getRecentActivity().map((log: any) => (
+                <li key={log.id} className="flex items-center justify-between p-3 bg-slate-50 rounded-lg hover:bg-slate-100 transition-colors">
+                  <div>
+                    <div className="font-medium text-slate-800">{log.task}</div>
+                    <div className="text-sm text-slate-500">
+                      {new Date(log.timestamp).toLocaleDateString()} - {log.duration} minutes
+                    </div>
+                  </div>
+                  <Badge variant="secondary">
+                    {log.type === 'invested' ? 'Invested' : 'Spent'}
+                  </Badge>
+                </li>
+              ))}
+            </ul>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 };

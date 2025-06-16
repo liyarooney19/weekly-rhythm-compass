@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -16,6 +17,16 @@ interface Project {
   status: string;
   investedHours?: number;
   spentHours?: number;
+  tasks: Task[];
+}
+
+interface Task {
+  id: number;
+  name: string;
+  completed: boolean;
+  estimatedHours: number;
+  investedHours: number;
+  spentHours: number;
 }
 
 interface TimeLog {
@@ -25,6 +36,7 @@ interface TimeLog {
   type: 'invested' | 'spent';
   timestamp: string;
   project?: string;
+  taskId?: string;
 }
 
 export const TimeTracker = () => {
@@ -34,6 +46,7 @@ export const TimeTracker = () => {
   const [timeLeft, setTimeLeft] = useState(25 * 60); // 25 minutes in seconds
   const [currentTask, setCurrentTask] = useState('');
   const [selectedProject, setSelectedProject] = useState('');
+  const [selectedTaskId, setSelectedTaskId] = useState('');
   const [timeType, setTimeType] = useState<'invested' | 'spent'>('invested');
   const [projects, setProjects] = useState<Project[]>([]);
   const [timeLogs, setTimeLogs] = useState<TimeLog[]>([]);
@@ -60,7 +73,7 @@ export const TimeTracker = () => {
   }, [isRunning, isPaused, timeLeft]);
 
   const loadData = () => {
-    // Load projects
+    // Load projects with tasks
     const savedProjects = localStorage.getItem('projects');
     if (savedProjects) {
       const parsedProjects = JSON.parse(savedProjects);
@@ -80,16 +93,21 @@ export const TimeTracker = () => {
     return `${minutes.toString().padStart(2, '0')}:${remainingSeconds.toString().padStart(2, '0')}`;
   };
 
-  const startTimer = () => {
-    if (!currentTask.trim()) {
-      toast({
-        title: "Error",
-        description: "Please enter a task name before starting the timer",
-        variant: "destructive"
-      });
-      return;
-    }
+  const getSelectedProject = () => {
+    return projects.find(p => p.id === selectedProject);
+  };
 
+  const getAvailableTasks = () => {
+    const project = getSelectedProject();
+    return project?.tasks || [];
+  };
+
+  const getSelectedTask = () => {
+    const tasks = getAvailableTasks();
+    return tasks.find(t => t.id.toString() === selectedTaskId);
+  };
+
+  const startTimer = () => {
     if (!selectedProject) {
       toast({
         title: "Error",
@@ -99,11 +117,25 @@ export const TimeTracker = () => {
       return;
     }
 
+    if (!selectedTaskId) {
+      toast({
+        title: "Error",
+        description: "Please select a task before starting the timer",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    const selectedTask = getSelectedTask();
+    if (selectedTask) {
+      setCurrentTask(selectedTask.name);
+    }
+
     setIsRunning(true);
     setIsPaused(false);
     toast({
       title: "Timer Started",
-      description: `Working on: ${currentTask}`
+      description: `Working on: ${selectedTask?.name}`
     });
   };
 
@@ -150,26 +182,43 @@ export const TimeTracker = () => {
       return;
     }
 
+    const selectedTask = getSelectedTask();
+    const selectedProjectData = getSelectedProject();
+
     const newLog: TimeLog = {
       id: Date.now().toString(),
-      task: currentTask,
+      task: selectedTask?.name || currentTask,
       duration: durationInMinutes,
       type: timeType,
       timestamp: new Date().toISOString(),
-      project: selectedProject || undefined
+      project: selectedProjectData?.name || undefined,
+      taskId: selectedTaskId || undefined
     };
 
     const updatedLogs = [...timeLogs, newLog];
     setTimeLogs(updatedLogs);
     localStorage.setItem('timeLogs', JSON.stringify(updatedLogs));
 
-    // Update project invested hours if applicable
-    if (selectedProject && timeType === 'invested') {
+    // Update task and project hours
+    if (selectedProject && selectedTaskId) {
       const updatedProjects = projects.map(project => {
         if (project.id === selectedProject) {
+          const updatedTasks = project.tasks.map(task => {
+            if (task.id.toString() === selectedTaskId) {
+              return {
+                ...task,
+                [timeType === 'invested' ? 'investedHours' : 'spentHours']: 
+                  (task[timeType === 'invested' ? 'investedHours' : 'spentHours'] || 0) + (durationInMinutes / 60)
+              };
+            }
+            return task;
+          });
+
           return {
             ...project,
-            investedHours: (project.investedHours || 0) + (durationInMinutes / 60)
+            tasks: updatedTasks,
+            [timeType === 'invested' ? 'investedHours' : 'spentHours']: 
+              (project[timeType === 'invested' ? 'investedHours' : 'spentHours'] || 0) + (durationInMinutes / 60)
           };
         }
         return project;
@@ -181,7 +230,7 @@ export const TimeTracker = () => {
 
     toast({
       title: "Session Completed!",
-      description: `Logged ${durationInMinutes} minutes of ${timeType} time for: ${currentTask}`
+      description: `Logged ${durationInMinutes} minutes of ${timeType} time for: ${selectedTask?.name || currentTask}`
     });
 
     // Reset for next session
@@ -190,6 +239,7 @@ export const TimeTracker = () => {
     setTimeLeft(customDuration * 60);
     setCurrentTask('');
     setSelectedProject('');
+    setSelectedTaskId('');
   };
 
   const setCustomTime = (minutes: number) => {
@@ -201,6 +251,11 @@ export const TimeTracker = () => {
 
   const getProgressPercentage = () => {
     return ((customDuration * 60 - timeLeft) / (customDuration * 60)) * 100;
+  };
+
+  const handleProjectChange = (projectId: string) => {
+    setSelectedProject(projectId);
+    setSelectedTaskId(''); // Reset task selection when project changes
   };
 
   return (
@@ -267,9 +322,9 @@ export const TimeTracker = () => {
               </div>
             )}
 
-            {/* Task Input */}
+            {/* Project and Task Selection */}
             <div className="space-y-4">
-              <Select value={selectedProject} onValueChange={setSelectedProject} disabled={isRunning}>
+              <Select value={selectedProject} onValueChange={handleProjectChange} disabled={isRunning}>
                 <SelectTrigger className={!selectedProject && !isRunning ? "border-red-300 focus:border-red-500" : ""}>
                   <SelectValue placeholder="Select project (required)" />
                 </SelectTrigger>
@@ -282,13 +337,23 @@ export const TimeTracker = () => {
                 </SelectContent>
               </Select>
 
-              <Input
-                placeholder="What specific task are you working on? (required)"
-                value={currentTask}
-                onChange={(e) => setCurrentTask(e.target.value)}
-                disabled={isRunning}
-                className={!currentTask.trim() && !isRunning ? "border-red-300 focus:border-red-500" : ""}
-              />
+              <Select value={selectedTaskId} onValueChange={setSelectedTaskId} disabled={isRunning || !selectedProject}>
+                <SelectTrigger className={!selectedTaskId && !isRunning ? "border-red-300 focus:border-red-500" : ""}>
+                  <SelectValue placeholder={selectedProject ? "Select task (required)" : "Select project first"} />
+                </SelectTrigger>
+                <SelectContent>
+                  {getAvailableTasks().map(task => (
+                    <SelectItem key={task.id} value={task.id.toString()}>
+                      <div className="flex items-center justify-between w-full">
+                        <span>{task.name}</span>
+                        <span className="text-xs text-slate-500 ml-2">
+                          {task.investedHours.toFixed(1)}h / {task.estimatedHours}h
+                        </span>
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
 
               <Select value={timeType} onValueChange={(value: 'invested' | 'spent') => setTimeType(value)} disabled={isRunning}>
                 <SelectTrigger>
@@ -314,7 +379,7 @@ export const TimeTracker = () => {
             {/* Timer Controls */}
             <div className="flex gap-2 justify-center">
               {!isRunning ? (
-                <Button onClick={startTimer} className="flex items-center gap-2">
+                <Button onClick={startTimer} className="flex items-center gap-2" disabled={!selectedProject || !selectedTaskId}>
                   <Play className="h-4 w-4" />
                   Start
                 </Button>
@@ -343,10 +408,10 @@ export const TimeTracker = () => {
             {isRunning && (
               <div className="bg-blue-50 p-4 rounded-lg">
                 <div className="text-sm text-blue-600 mb-1">Current Session</div>
-                <div className="font-medium text-blue-800">{currentTask}</div>
+                <div className="font-medium text-blue-800">{getSelectedTask()?.name}</div>
                 {selectedProject && (
                   <div className="text-sm text-blue-600">
-                    Project: {projects.find(p => p.id === selectedProject)?.name}
+                    Project: {getSelectedProject()?.name}
                   </div>
                 )}
                 <div className="flex items-center gap-2 mt-2">
