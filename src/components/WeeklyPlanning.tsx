@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -23,8 +22,8 @@ interface Task {
 
 interface WeeklyTask {
   id: string;
-  projectId: string;
-  taskId: string;
+  projectId: string | null;
+  taskId: string | null;
   projectName: string;
   taskName: string;
   estimatedHours: number;
@@ -39,6 +38,8 @@ export const WeeklyPlanning = () => {
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [taskEstimatedHours, setTaskEstimatedHours] = useState('');
+  const [standaloneTaskName, setStandaloneTaskName] = useState('');
+  const [standaloneTaskHours, setStandaloneTaskHours] = useState('');
 
   const formatHours = (hours: number | string): number => {
     const numHours = typeof hours === 'string' ? parseFloat(hours) || 0 : hours || 0;
@@ -50,9 +51,9 @@ export const WeeklyPlanning = () => {
     
     return {
       id: task.id || Date.now().toString(),
-      projectId: task.projectId || '',
-      taskId: task.taskId || '',
-      projectName: task.projectName || 'Unknown Project',
+      projectId: task.projectId || null,
+      taskId: task.taskId || null,
+      projectName: task.projectName || 'Standalone Task',
       taskName: task.taskName || 'Unknown Task',
       estimatedHours: formatHours(task.estimatedHours),
       completed: Boolean(task.completed),
@@ -169,6 +170,42 @@ export const WeeklyPlanning = () => {
     });
   };
 
+  const addStandaloneTask = () => {
+    if (!standaloneTaskName.trim()) {
+      toast({
+        title: "Error",
+        description: "Please enter a task name",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    const estimatedHours = formatHours(standaloneTaskHours || 0);
+
+    const newTask: WeeklyTask = {
+      id: Date.now().toString(),
+      projectId: null,
+      taskId: null,
+      projectName: 'Standalone Task',
+      taskName: standaloneTaskName.trim(),
+      estimatedHours: estimatedHours,
+      completed: false,
+      actualHours: 0
+    };
+
+    const updatedTasks = [...weeklyTasks, newTask];
+    saveWeeklyTasks(updatedTasks);
+
+    // Reset form
+    setStandaloneTaskName('');
+    setStandaloneTaskHours('');
+
+    toast({
+      title: "Standalone Task Added",
+      description: "Task has been added to this week's plan"
+    });
+  };
+
   const updateTaskHours = (taskId: string, hours: string) => {
     const numericHours = formatHours(hours);
     const updatedTasks = weeklyTasks.map(task =>
@@ -255,75 +292,112 @@ export const WeeklyPlanning = () => {
         <CardHeader>
           <CardTitle>Add Tasks to This Week</CardTitle>
         </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="text-sm font-medium mb-2 block">Select Project</label>
-              <Select value={selectedProject?.id || ''} onValueChange={(value) => {
-                const project = projects.find(p => p.id === value);
-                setSelectedProject(project || null);
-                setSelectedTask(null);
-              }}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Choose a project..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {projects
-                    .filter(p => (p.status === 'active' || !p.status) && p.name && p.name.trim())
-                    .map(project => (
-                      <SelectItem key={project.id} value={project.id}>
-                        {project.name}
-                      </SelectItem>
-                    ))}
-                </SelectContent>
-              </Select>
+        <CardContent className="space-y-6">
+          {/* Project Tasks */}
+          <div className="space-y-4">
+            <h3 className="text-lg font-medium">From Projects</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="text-sm font-medium mb-2 block">Select Project</label>
+                <Select value={selectedProject?.id || ''} onValueChange={(value) => {
+                  const project = projects.find(p => p.id === value);
+                  setSelectedProject(project || null);
+                  setSelectedTask(null);
+                }}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Choose a project..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {projects
+                      .filter(p => (p.status === 'active' || !p.status) && p.name && p.name.trim())
+                      .map(project => (
+                        <SelectItem key={project.id} value={project.id}>
+                          {project.name}
+                        </SelectItem>
+                      ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div>
+                <label className="text-sm font-medium mb-2 block">Select Task</label>
+                <Select 
+                  value={selectedTask?.id || ''} 
+                  onValueChange={(value) => {
+                    const task = selectedProject?.tasks?.find(t => t.id === value);
+                    setSelectedTask(task || null);
+                  }}
+                  disabled={!selectedProject}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Choose a task..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {selectedProject?.tasks
+                      ?.filter(task => task.name && task.name.trim())
+                      .map(task => (
+                        <SelectItem key={task.id} value={task.id}>
+                          {task.name}
+                        </SelectItem>
+                      )) || []}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
 
-            <div>
-              <label className="text-sm font-medium mb-2 block">Select Task</label>
-              <Select 
-                value={selectedTask?.id || ''} 
-                onValueChange={(value) => {
-                  const task = selectedProject?.tasks?.find(t => t.id === value);
-                  setSelectedTask(task || null);
-                }}
-                disabled={!selectedProject}
+            <div className="flex gap-4 items-end">
+              <div className="flex-1">
+                <label className="text-sm font-medium mb-2 block">Estimated Hours</label>
+                <Input
+                  type="number"
+                  step="0.1"
+                  min="0"
+                  placeholder="e.g., 2.5"
+                  value={taskEstimatedHours}
+                  onChange={(e) => setTaskEstimatedHours(e.target.value)}
+                />
+              </div>
+              <Button 
+                onClick={addTaskToWeek}
+                disabled={!selectedProject || !selectedTask}
               >
-                <SelectTrigger>
-                  <SelectValue placeholder="Choose a task..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {selectedProject?.tasks
-                    ?.filter(task => task.name && task.name.trim())
-                    .map(task => (
-                      <SelectItem key={task.id} value={task.id}>
-                        {task.name}
-                      </SelectItem>
-                    )) || []}
-                </SelectContent>
-              </Select>
+                <Plus className="h-4 w-4 mr-2" />
+                Add Project Task
+              </Button>
             </div>
           </div>
 
-          <div className="flex gap-4 items-end">
-            <div className="flex-1">
-              <label className="text-sm font-medium mb-2 block">Estimated Hours</label>
-              <Input
-                type="number"
-                step="0.1"
-                min="0"
-                placeholder="e.g., 2.5"
-                value={taskEstimatedHours}
-                onChange={(e) => setTaskEstimatedHours(e.target.value)}
-              />
+          {/* Standalone Tasks */}
+          <div className="space-y-4 border-t pt-6">
+            <h3 className="text-lg font-medium">Standalone Tasks</h3>
+            <div className="flex gap-4 items-end">
+              <div className="flex-1">
+                <label className="text-sm font-medium mb-2 block">Task Name</label>
+                <Input
+                  placeholder="e.g., Clean workspace, Review emails..."
+                  value={standaloneTaskName}
+                  onChange={(e) => setStandaloneTaskName(e.target.value)}
+                />
+              </div>
+              <div className="w-32">
+                <label className="text-sm font-medium mb-2 block">Estimated Hours</label>
+                <Input
+                  type="number"
+                  step="0.1"
+                  min="0"
+                  placeholder="e.g., 1.5"
+                  value={standaloneTaskHours}
+                  onChange={(e) => setStandaloneTaskHours(e.target.value)}
+                />
+              </div>
+              <Button 
+                onClick={addStandaloneTask}
+                disabled={!standaloneTaskName.trim()}
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                Add Standalone Task
+              </Button>
             </div>
-            <Button 
-              onClick={addTaskToWeek}
-              disabled={!selectedProject || !selectedTask}
-            >
-              <Plus className="h-4 w-4 mr-2" />
-              Add Selected Task
-            </Button>
           </div>
         </CardContent>
       </Card>
@@ -338,7 +412,7 @@ export const WeeklyPlanning = () => {
             <div className="text-center py-8 text-slate-500">
               <Calendar className="h-12 w-12 mx-auto mb-4 text-slate-300" />
               <p>No tasks planned for this week yet.</p>
-              <p className="text-sm">Add tasks from your projects above.</p>
+              <p className="text-sm">Add tasks from your projects or create standalone tasks above.</p>
             </div>
           ) : (
             <div className="space-y-4">
