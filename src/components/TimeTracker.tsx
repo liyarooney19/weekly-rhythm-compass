@@ -286,16 +286,19 @@ export const TimeTracker = () => {
   const selectedProjectData = projects.find(p => p.id.toString() === selectedProject);
   const availableTasks = selectedProjectData?.tasks || [];
 
-  // Clear selected task when project changes
-  useEffect(() => {
-    if (selectedProject && selectedProjectData) {
-      // If the selected task doesn't exist in the new project, clear it
-      const taskExists = availableTasks.some(t => t.id.toString() === selectedTask);
+  // Handle project change - clear task if it doesn't exist in new project
+  const handleProjectChange = (projectId: string) => {
+    setSelectedProject(projectId);
+    
+    // Clear selected task when project changes
+    const newProject = projects.find(p => p.id.toString() === projectId);
+    if (newProject) {
+      const taskExists = newProject.tasks.some(t => t.id.toString() === selectedTask);
       if (!taskExists) {
         setSelectedTask('');
       }
     }
-  }, [selectedProject]);
+  };
 
   return (
     <div className="space-y-6">
@@ -334,7 +337,7 @@ export const TimeTracker = () => {
             <div className="space-y-4">
               <div>
                 <label className="block text-sm font-medium mb-2">Project</label>
-                <Select value={selectedProject} onValueChange={setSelectedProject}>
+                <Select value={selectedProject} onValueChange={handleProjectChange}>
                   <SelectTrigger>
                     <SelectValue placeholder="Select a project..." />
                   </SelectTrigger>
