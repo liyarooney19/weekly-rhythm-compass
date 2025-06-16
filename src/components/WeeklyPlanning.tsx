@@ -1,451 +1,371 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Plus, Calendar, Clock, Target, Trash2, CheckCircle } from 'lucide-react';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Progress } from '@/components/ui/progress';
+import { Calendar, CheckCircle, Clock, Plus, Trash2, Target } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
+interface Project {
+  id: string;
+  name: string;
+  status: string;
+  tasks: Task[];
+}
+
+interface Task {
+  id: string;
+  name: string;
+}
+
 interface WeeklyTask {
-  id: number;
-  type: 'project' | 'personal';
-  title: string;
+  id: string;
+  projectId: string;
+  taskId: string;
+  projectName: string;
+  taskName: string;
   estimatedHours: number;
-  timeType: 'invested' | 'spent';
-  project?: string;
-  projectId?: number;
-  taskId?: number;
   completed: boolean;
+  actualHours: number;
 }
 
 export const WeeklyPlanning = () => {
-  const [tasks, setTasks] = useState<WeeklyTask[]>([]);
-  const [newTask, setNewTask] = useState({ 
-    title: '', 
-    estimatedHours: '1', 
-    timeType: 'invested', 
-    project: '',
-    projectId: 0,
-    taskId: 0
-  });
-  const [projects, setProjects] = useState<any[]>([]);
-  const [selectedProject, setSelectedProject] = useState('');
-  const [selectedTask, setSelectedTask] = useState('');
   const { toast } = useToast();
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [weeklyTasks, setWeeklyTasks] = useState<WeeklyTask[]>([]);
+  const [selectedProject, setSelectedProject] = useState<Project | null>(null);
+  const [selectedTask, setSelectedTask] = useState<Task | null>(null);
+  const [taskEstimatedHours, setTaskEstimatedHours] = useState('');
+
+  const formatHours = (hours: number) => {
+    return Math.round(hours * 10) / 10; // Round to 1 decimal place
+  };
 
   useEffect(() => {
-    loadTasks();
-    loadProjects();
-    syncWithTimeLogs();
+    loadData();
   }, []);
 
-  const loadTasks = () => {
-    const saved = localStorage.getItem('weeklyTasks');
-    if (saved) {
-      try {
-        setTasks(JSON.parse(saved));
-      } catch (error) {
-        console.error('Error loading weekly tasks:', error);
-      }
-    }
-  };
-
-  const loadProjects = () => {
+  const loadData = () => {
+    // Load projects
     const savedProjects = localStorage.getItem('projects');
-    if (savedProjects) {
-      try {
-        setProjects(JSON.parse(savedProjects));
-      } catch (error) {
-        console.error('Error loading projects:', error);
-      }
-    }
+    setProjects(savedProjects ? JSON.parse(savedProjects) : []);
+
+    // Load weekly tasks
+    const savedWeeklyTasks = localStorage.getItem('weeklyTasks');
+    setWeeklyTasks(savedWeeklyTasks ? JSON.parse(savedWeeklyTasks) : []);
   };
 
-  const saveTasks = (updatedTasks: WeeklyTask[]) => {
-    setTasks(updatedTasks);
-    localStorage.setItem('weeklyTasks', JSON.stringify(updatedTasks));
+  const saveWeeklyTasks = (tasks: WeeklyTask[]) => {
+    localStorage.setItem('weeklyTasks', JSON.stringify(tasks));
   };
 
-  const addTask = () => {
-    if (!newTask.title.trim()) {
-      toast({
-        title: "Error",
-        description: "Please enter a task title",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    const estimatedHours = parseFloat(newTask.estimatedHours);
-    if (isNaN(estimatedHours) || estimatedHours <= 0) {
-      toast({
-        title: "Error",
-        description: "Please enter valid estimated hours",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    const task: WeeklyTask = { 
-      id: Date.now(), 
-      type: newTask.project ? 'project' : 'personal',
-      title: newTask.title, 
-      estimatedHours: estimatedHours, 
-      timeType: newTask.timeType as 'invested' | 'spent',
-      project: newTask.project,
-      projectId: newTask.projectId || undefined,
-      taskId: newTask.taskId || undefined,
-      completed: false
-    };
-
-    const updatedTasks = [...tasks, task];
-    saveTasks(updatedTasks);
-    
-    setNewTask({ 
-      title: '', 
-      estimatedHours: '1', 
-      timeType: 'invested', 
-      project: '',
-      projectId: 0,
-      taskId: 0
-    });
-    
-    toast({
-      title: "Success",
-      description: "Task added to weekly plan"
-    });
+  const toggleTaskCompletion = (taskId: string) => {
+    const updatedTasks = weeklyTasks.map(task =>
+      task.id === taskId ? { ...task, completed: !task.completed } : task
+    );
+    setWeeklyTasks(updatedTasks);
+    saveWeeklyTasks(updatedTasks);
   };
 
-  const addExistingTask = () => {
+  const removeTaskFromWeek = (taskId: string) => {
+    const updatedTasks = weeklyTasks.filter(task => task.id !== taskId);
+    setWeeklyTasks(updatedTasks);
+    saveWeeklyTasks(updatedTasks);
+  };
+
+  const addTaskToWeek = () => {
     if (!selectedProject || !selectedTask) {
       toast({
         title: "Error",
-        description: "Please select both project and task",
+        description: "Please select both a project and task",
         variant: "destructive"
       });
       return;
     }
 
-    const project = projects.find(p => p.id.toString() === selectedProject);
-    const task = project?.tasks.find((t: any) => t.id.toString() === selectedTask);
-    
-    if (!project || !task) return;
+    const estimatedHours = parseFloat(taskEstimatedHours) || 0;
 
-    const weeklyTask: WeeklyTask = {
-      id: Date.now(),
-      type: 'project',
-      title: task.name,
-      estimatedHours: task.estimatedHours || 1,
-      timeType: 'invested',
-      project: project.name,
-      projectId: project.id,
-      taskId: task.id,
-      completed: false
+    const newTask = {
+      id: Date.now().toString(),
+      projectId: selectedProject.id,
+      taskId: selectedTask.id,
+      projectName: selectedProject.name,
+      taskName: selectedTask.name,
+      estimatedHours: formatHours(estimatedHours),
+      completed: false,
+      actualHours: 0
     };
 
-    const updatedTasks = [...tasks, weeklyTask];
-    saveTasks(updatedTasks);
-    
-    setSelectedProject('');
-    setSelectedTask('');
-    
+    const updatedTasks = [...weeklyTasks, newTask];
+    setWeeklyTasks(updatedTasks);
+    saveWeeklyTasks(updatedTasks);
+
+    // Reset selections
+    setSelectedProject(null);
+    setSelectedTask(null);
+    setTaskEstimatedHours('');
+
     toast({
-      title: "Success",
-      description: "Project task added to weekly plan"
+      title: "Task Added",
+      description: "Task has been added to this week's plan"
     });
   };
 
-  const toggleTaskComplete = (taskId: number) => {
-    const updatedTasks = tasks.map(task => 
-      task.id === taskId ? { ...task, completed: !task.completed } : task
+  const updateTaskHours = (taskId: string, hours: string) => {
+    const numericHours = parseFloat(hours) || 0;
+    const updatedTasks = weeklyTasks.map(task =>
+      task.id === taskId
+        ? { ...task, actualHours: formatHours(numericHours) }
+        : task
     );
-    saveTasks(updatedTasks);
+    setWeeklyTasks(updatedTasks);
+    saveWeeklyTasks(updatedTasks);
   };
 
-  const deleteTask = (taskId: number) => {
-    const updatedTasks = tasks.filter(task => task.id !== taskId);
-    saveTasks(updatedTasks);
-    
-    toast({
-      title: "Success",
-      description: "Task removed from weekly plan"
-    });
+  const updateEstimatedHours = (taskId: string, hours: string) => {
+    const numericHours = parseFloat(hours) || 0;
+    const updatedTasks = weeklyTasks.map(task =>
+      task.id === taskId
+        ? { ...task, estimatedHours: formatHours(numericHours) }
+        : task
+    );
+    setWeeklyTasks(updatedTasks);
+    saveWeeklyTasks(updatedTasks);
   };
 
-  const syncWithTimeLogs = () => {
-    const savedLogs = localStorage.getItem('timeLogs');
-    if (!savedLogs) return;
-
-    try {
-      const logs = JSON.parse(savedLogs);
-      const oneWeekAgo = new Date();
-      oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
-      
-      // Get this week's logs
-      const weeklyLogs = logs.filter((log: any) => {
-        const logDate = new Date(log.timestamp);
-        return logDate >= oneWeekAgo;
-      });
-
-      // Update task completed status based on actual time logged
-      const savedTasks = localStorage.getItem('weeklyTasks');
-      if (savedTasks) {
-        const tasks = JSON.parse(savedTasks);
-        const updatedTasks = tasks.map((task: any) => {
-          const taskLogs = weeklyLogs.filter((log: any) => 
-            log.projectId === task.projectId && log.taskId === task.taskId
-          );
-          const totalLogged = taskLogs.reduce((sum: number, log: any) => sum + (log.duration / 60), 0);
-          
-          // Mark as completed if logged time meets or exceeds estimated time
-          if (totalLogged >= task.estimatedHours && !task.completed) {
-            return { ...task, completed: true };
-          }
-          return task;
-        });
-        
-        localStorage.setItem('weeklyTasks', JSON.stringify(updatedTasks));
-        setTasks(updatedTasks);
-      }
-    } catch (error) {
-      console.error('Error syncing with time logs:', error);
-    }
+  const getTotalPlannedHours = () => {
+    return formatHours(weeklyTasks.reduce((sum, task) => sum + task.estimatedHours, 0));
   };
 
-  const totalPlannedHours = tasks.reduce((sum, task) => sum + task.estimatedHours, 0);
-  const investedHours = tasks.filter(task => task.timeType === 'invested').reduce((sum, task) => sum + task.estimatedHours, 0);
-  const spentHours = tasks.filter(task => task.timeType === 'spent').reduce((sum, task) => sum + task.estimatedHours, 0);
-  const completedTasks = tasks.filter(task => task.completed).length;
-
-  const getActualLoggedHours = () => {
-    const savedLogs = localStorage.getItem('timeLogs');
-    if (!savedLogs) return { actualInvested: 0, actualSpent: 0 };
-
-    try {
-      const logs = JSON.parse(savedLogs);
-      const oneWeekAgo = new Date();
-      oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
-      
-      const weeklyLogs = logs.filter((log: any) => {
-        const logDate = new Date(log.timestamp);
-        return logDate >= oneWeekAgo;
-      });
-
-      const actualInvested = weeklyLogs
-        .filter((log: any) => log.type === 'invested')
-        .reduce((sum: number, log: any) => sum + (log.duration / 60), 0);
-      
-      const actualSpent = weeklyLogs
-        .filter((log: any) => log.type === 'spent')
-        .reduce((sum: number, log: any) => sum + (log.duration / 60), 0);
-
-      return { actualInvested, actualSpent };
-    } catch (error) {
-      console.error('Error calculating actual hours:', error);
-      return { actualInvested: 0, actualSpent: 0 };
-    }
+  const getTotalActualHours = () => {
+    return formatHours(weeklyTasks.reduce((sum, task) => sum + task.actualHours, 0));
   };
 
-  const { actualInvested, actualSpent } = getActualLoggedHours();
+  const getCompletionPercentage = () => {
+    if (weeklyTasks.length === 0) return 0;
+    const completedTasks = weeklyTasks.filter(task => task.completed);
+    return Math.round((completedTasks.length / weeklyTasks.length) * 100);
+  };
 
-  const selectedProjectData = projects.find(p => p.id.toString() === selectedProject);
-  const availableTasks = selectedProjectData?.tasks || [];
+  const getCompletedTasksCount = () => {
+    return weeklyTasks.filter(task => task.completed).length;
+  };
 
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-3xl font-bold text-slate-800 mb-2">Weekly Planning</h1>
-        <p className="text-slate-600">Plan your week based on strategy session outcomes</p>
+        <p className="text-slate-600">Plan and track your weekly tasks and goals</p>
       </div>
 
       {/* Weekly Summary */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-slate-600">Planned Hours</p>
-                <p className="text-2xl font-bold text-slate-800">{totalPlannedHours}h</p>
-              </div>
-              <Clock className="h-8 w-8 text-slate-400" />
-            </div>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Total Planned</CardTitle>
+            <Target className="h-4 w-4 text-slate-500" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{getTotalPlannedHours()}h</div>
+            <p className="text-xs text-slate-500">Estimated hours</p>
           </CardContent>
         </Card>
 
         <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-slate-600">Actual Invested</p>
-                <p className="text-2xl font-bold text-green-600">{actualInvested.toFixed(1)}h</p>
-                <p className="text-xs text-slate-500">Planned: {investedHours}h</p>
-              </div>
-              <Target className="h-8 w-8 text-green-400" />
-            </div>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Actual Hours</CardTitle>
+            <Clock className="h-4 w-4 text-slate-500" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{getTotalActualHours()}h</div>
+            <p className="text-xs text-slate-500">Time logged</p>
           </CardContent>
         </Card>
 
         <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-slate-600">Actual Spent</p>
-                <p className="text-2xl font-bold text-orange-600">{actualSpent.toFixed(1)}h</p>
-                <p className="text-xs text-slate-500">Planned: {spentHours}h</p>
-              </div>
-              <Calendar className="h-8 w-8 text-orange-400" />
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-slate-600">Completed</p>
-                <p className="text-2xl font-bold text-blue-600">{completedTasks}</p>
-              </div>
-              <CheckCircle className="h-8 w-8 text-blue-400" />
-            </div>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Completion</CardTitle>
+            <CheckCircle className="h-4 w-4 text-slate-500" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{getCompletionPercentage()}%</div>
+            <p className="text-xs text-slate-500">{getCompletedTasksCount()} of {weeklyTasks.length} tasks</p>
           </CardContent>
         </Card>
       </div>
 
-      {/* Add Existing Project Task */}
+      {/* Add Tasks Section */}
       <Card>
         <CardHeader>
-          <CardTitle>Add Existing Project Task</CardTitle>
+          <CardTitle>Add Tasks to This Week</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <Select value={selectedProject} onValueChange={setSelectedProject}>
-              <SelectTrigger>
-                <SelectValue placeholder="Select project..." />
-              </SelectTrigger>
-              <SelectContent>
-                {projects.map((project) => (
-                  <SelectItem key={project.id} value={project.id.toString()}>
-                    {project.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="text-sm font-medium mb-2 block">Select Project</label>
+              <Select value={selectedProject?.id || ''} onValueChange={(value) => {
+                const project = projects.find(p => p.id === value);
+                setSelectedProject(project || null);
+                setSelectedTask(null);
+              }}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Choose a project..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {projects.filter(p => p.status === 'active' || !p.status).map(project => (
+                    <SelectItem key={project.id} value={project.id}>
+                      {project.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
 
-            <Select value={selectedTask} onValueChange={setSelectedTask} disabled={!selectedProject}>
-              <SelectTrigger>
-                <SelectValue placeholder="Select task..." />
-              </SelectTrigger>
-              <SelectContent>
-                {availableTasks.map((task: any) => (
-                  <SelectItem key={task.id} value={task.id.toString()}>
-                    {task.name} ({task.estimatedHours}h)
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-
-            <div className="col-span-2">
-              <Button 
-                onClick={addExistingTask}
-                disabled={!selectedProject || !selectedTask}
-                className="w-full"
+            <div>
+              <label className="text-sm font-medium mb-2 block">Select Task</label>
+              <Select 
+                value={selectedTask?.id || ''} 
+                onValueChange={(value) => {
+                  const task = selectedProject?.tasks?.find(t => t.id === value);
+                  setSelectedTask(task || null);
+                }}
+                disabled={!selectedProject}
               >
-                <Plus className="h-4 w-4 mr-2" />
-                Add Selected Task
-              </Button>
+                <SelectTrigger>
+                  <SelectValue placeholder="Choose a task..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {selectedProject?.tasks?.map(task => (
+                    <SelectItem key={task.id} value={task.id}>
+                      {task.name}
+                    </SelectItem>
+                  )) || []}
+                </SelectContent>
+              </Select>
             </div>
           </div>
-        </CardContent>
-      </Card>
 
-      {/* Add New Task */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Add New Weekly Task</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-            <Input
-              placeholder="Task title..."
-              value={newTask.title}
-              onChange={(e) => setNewTask({ ...newTask, title: e.target.value })}
-            />
-            <Input
-              type="number"
-              placeholder="Hours (e.g., 1.5)"
-              value={newTask.estimatedHours}
-              onChange={(e) => setNewTask({ ...newTask, estimatedHours: e.target.value })}
-              step="0.1"
-              min="0.1"
-            />
-            <select
-              value={newTask.timeType}
-              onChange={(e) => setNewTask({ ...newTask, timeType: e.target.value as 'invested' | 'spent' })}
-              className="px-3 py-2 border border-slate-300 rounded-md"
+          <div className="flex gap-4 items-end">
+            <div className="flex-1">
+              <label className="text-sm font-medium mb-2 block">Estimated Hours</label>
+              <Input
+                type="number"
+                step="0.1"
+                min="0"
+                placeholder="e.g., 2.5"
+                value={taskEstimatedHours}
+                onChange={(e) => setTaskEstimatedHours(e.target.value)}
+              />
+            </div>
+            <Button 
+              onClick={addTaskToWeek}
+              disabled={!selectedProject || !selectedTask}
             >
-              <option value="invested">Invested</option>
-              <option value="spent">Spent</option>
-            </select>
-            <Input
-              placeholder="Project (optional)"
-              value={newTask.project}
-              onChange={(e) => setNewTask({ ...newTask, project: e.target.value })}
-            />
-            <Button onClick={addTask}>
               <Plus className="h-4 w-4 mr-2" />
-              Add Task
+              Add Selected Task
             </Button>
           </div>
         </CardContent>
       </Card>
 
-      {/* Tasks List */}
+      {/* Weekly Tasks */}
       <Card>
         <CardHeader>
           <CardTitle>This Week's Tasks</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="space-y-3">
-            {tasks.map((task) => (
-              <div key={task.id} className="flex items-center justify-between p-3 border border-slate-200 rounded-lg">
-                <div className="flex items-center gap-3">
-                  <button 
-                    onClick={() => toggleTaskComplete(task.id)}
-                    className={`w-4 h-4 rounded-full ${task.completed ? 'bg-green-500' : 'bg-slate-300'}`}
-                  ></button>
-                  <div>
-                    <h3 className={`font-medium ${task.completed ? 'line-through text-slate-500' : 'text-slate-800'}`}>
-                      {task.title}
-                    </h3>
-                    {task.project && (
-                      <p className="text-sm text-slate-600">Project: {task.project}</p>
-                    )}
+          {weeklyTasks.length === 0 ? (
+            <div className="text-center py-8 text-slate-500">
+              <Calendar className="h-12 w-12 mx-auto mb-4 text-slate-300" />
+              <p>No tasks planned for this week yet.</p>
+              <p className="text-sm">Add tasks from your projects above.</p>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {weeklyTasks.map(task => (
+                <div key={task.id} className="flex items-center gap-4 p-4 border rounded-lg">
+                  <Checkbox 
+                    checked={task.completed}
+                    onCheckedChange={(checked) => toggleTaskCompletion(task.id)}
+                  />
+                  <div className="flex-1">
+                    <div className={`font-medium ${task.completed ? 'line-through text-slate-500' : ''}`}>
+                      {task.taskName}
+                    </div>
+                    <div className="text-sm text-slate-500">
+                      {task.projectName}
+                    </div>
                   </div>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Badge variant={task.timeType === 'invested' ? 'default' : 'secondary'}>
-                    {task.timeType}
-                  </Badge>
-                  <span className="text-sm text-slate-600">{task.estimatedHours}h</span>
-                  <Button 
-                    size="sm" 
+                  <div className="flex gap-2 items-center">
+                    <div className="text-sm">
+                      <label className="block text-xs text-slate-500 mb-1">Estimated</label>
+                      <Input
+                        type="number"
+                        step="0.1"
+                        min="0"
+                        value={task.estimatedHours}
+                        onChange={(e) => updateEstimatedHours(task.id, e.target.value)}
+                        className="w-20 text-center"
+                      />
+                    </div>
+                    <div className="text-sm">
+                      <label className="block text-xs text-slate-500 mb-1">Actual</label>
+                      <Input
+                        type="number"
+                        step="0.1"
+                        min="0"
+                        value={task.actualHours}
+                        onChange={(e) => updateTaskHours(task.id, e.target.value)}
+                        className="w-20 text-center"
+                      />
+                    </div>
+                  </div>
+                  <Button
                     variant="outline"
-                    onClick={() => deleteTask(task.id)}
+                    size="sm"
+                    onClick={() => removeTaskFromWeek(task.id)}
                   >
                     <Trash2 className="h-4 w-4" />
                   </Button>
                 </div>
-              </div>
-            ))}
-            
-            {tasks.length === 0 && (
-              <p className="text-slate-500 text-center py-4">No tasks planned for this week</p>
-            )}
-          </div>
+              ))}
+            </div>
+          )}
         </CardContent>
       </Card>
+
+      {/* Weekly Progress */}
+      {weeklyTasks.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Weekly Progress</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              <div>
+                <div className="flex justify-between text-sm mb-2">
+                  <span>Tasks Completed</span>
+                  <span>{getCompletedTasksCount()} / {weeklyTasks.length}</span>
+                </div>
+                <Progress value={getCompletionPercentage()} />
+              </div>
+              
+              <div className="grid grid-cols-2 gap-4 text-sm">
+                <div>
+                  <span className="text-slate-500">Planned Hours:</span>
+                  <span className="font-medium ml-2">{getTotalPlannedHours()}h</span>
+                </div>
+                <div>
+                  <span className="text-slate-500">Actual Hours:</span>
+                  <span className="font-medium ml-2">{getTotalActualHours()}h</span>
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 };

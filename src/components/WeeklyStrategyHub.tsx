@@ -43,6 +43,7 @@ export const WeeklyStrategyHub = () => {
   const [agendaItems, setAgendaItems] = useState<AgendaItem[]>([]);
   const [editAgendaDialog, setEditAgendaDialog] = useState(false);
   const [newAgendaItem, setNewAgendaItem] = useState({ title: '', description: '' });
+  const [isLoading, setIsLoading] = useState(true);
 
   const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
@@ -86,26 +87,36 @@ export const WeeklyStrategyHub = () => {
   ];
 
   useEffect(() => {
-    try {
-      loadData();
-      initializeCurrentSession();
-    } catch (error) {
-      console.error('Error initializing WeeklyStrategyHub:', error);
-    }
+    const initializeComponent = async () => {
+      try {
+        setIsLoading(true);
+        await loadData();
+        initializeCurrentSession();
+      } catch (error) {
+        console.error('Error initializing WeeklyStrategyHub:', error);
+        // Set default values on error
+        setAgendaItems(defaultAgendaItems);
+        initializeCurrentSession();
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    initializeComponent();
   }, []);
 
   // Save progress whenever session changes
   useEffect(() => {
-    if (currentSession.id) {
+    if (currentSession.id && !isLoading) {
       try {
         localStorage.setItem('currentWeeklySession', JSON.stringify(currentSession));
       } catch (error) {
         console.error('Error saving current session:', error);
       }
     }
-  }, [currentSession]);
+  }, [currentSession, isLoading]);
 
-  const loadData = () => {
+  const loadData = async () => {
     try {
       const savedStrategyDay = localStorage.getItem('weeklyStrategyDay');
       if (savedStrategyDay) {
@@ -114,12 +125,14 @@ export const WeeklyStrategyHub = () => {
 
       const savedHistory = localStorage.getItem('weeklyStrategyHistory');
       if (savedHistory) {
-        setSessionHistory(JSON.parse(savedHistory));
+        const parsedHistory = JSON.parse(savedHistory);
+        setSessionHistory(Array.isArray(parsedHistory) ? parsedHistory : []);
       }
 
       const savedAgenda = localStorage.getItem('weeklyAgendaItems');
       if (savedAgenda) {
-        setAgendaItems(JSON.parse(savedAgenda));
+        const parsedAgenda = JSON.parse(savedAgenda);
+        setAgendaItems(Array.isArray(parsedAgenda) ? parsedAgenda : defaultAgendaItems);
       } else {
         setAgendaItems(defaultAgendaItems);
       }
@@ -129,7 +142,11 @@ export const WeeklyStrategyHub = () => {
         const parsed = JSON.parse(savedCurrentSession);
         const currentWeek = getWeekId(new Date());
         if (parsed.id === currentWeek && !parsed.completed) {
-          setCurrentSession(parsed);
+          setCurrentSession({
+            ...parsed,
+            completedItems: Array.isArray(parsed.completedItems) ? parsed.completedItems : [],
+            notes: parsed.notes && typeof parsed.notes === 'object' ? parsed.notes : {}
+          });
           return;
         }
       }
@@ -244,12 +261,12 @@ export const WeeklyStrategyHub = () => {
   };
 
   const getCompletionPercentage = () => {
-    if (agendaItems.length === 0) return 0;
+    if (!agendaItems || agendaItems.length === 0) return 0;
     return Math.round((currentSession.completedItems.length / agendaItems.length) * 100);
   };
 
   const allItemsCompleted = () => {
-    return agendaItems.length > 0 && currentSession.completedItems.length === agendaItems.length;
+    return agendaItems && agendaItems.length > 0 && currentSession.completedItems.length === agendaItems.length;
   };
 
   const saveAgendaItems = (items: AgendaItem[]) => {
@@ -304,7 +321,7 @@ export const WeeklyStrategyHub = () => {
     });
   };
 
-  if (!agendaItems || agendaItems.length === 0) {
+  if (isLoading) {
     return (
       <div className="space-y-6">
         <div className="flex items-center justify-between">
@@ -313,6 +330,33 @@ export const WeeklyStrategyHub = () => {
             <p className="text-slate-600">Loading your weekly strategy session...</p>
           </div>
         </div>
+      </div>
+    );
+  }
+
+  if (!agendaItems || agendaItems.length === 0) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold text-slate-800 mb-2">Weekly Strategy Hub</h1>
+            <p className="text-slate-600">Setting up your weekly strategy session...</p>
+          </div>
+        </div>
+        <Card>
+          <CardContent className="p-6">
+            <p className="text-slate-600">Initializing your weekly strategy agenda...</p>
+            <Button 
+              onClick={() => {
+                setAgendaItems(defaultAgendaItems);
+                initializeCurrentSession();
+              }}
+              className="mt-4"
+            >
+              Initialize Default Agenda
+            </Button>
+          </CardContent>
+        </Card>
       </div>
     );
   }
