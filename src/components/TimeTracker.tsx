@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -45,8 +44,11 @@ export const TimeTracker = () => {
   const [recentLogs, setRecentLogs] = useState<TimeLog[]>([]);
   const { toast } = useToast();
 
+  console.log('TimeTracker render - selectedProject:', selectedProject, 'projects length:', projects.length);
+
   // Load projects and check for current timer task
   useEffect(() => {
+    console.log('Loading projects and recent logs...');
     loadProjects();
     loadRecentLogs();
     
@@ -55,6 +57,7 @@ export const TimeTracker = () => {
     if (currentTask) {
       try {
         const taskData = JSON.parse(currentTask);
+        console.log('Found current timer task:', taskData);
         setSelectedProject(taskData.projectId.toString());
         setSelectedTask(taskData.taskId.toString());
         localStorage.removeItem('currentTimerTask'); // Clear after setting
@@ -70,6 +73,7 @@ export const TimeTracker = () => {
   }, []);
 
   const loadProjects = () => {
+    console.log('loadProjects called');
     const savedStrategy = localStorage.getItem('strategySession');
     const savedProjects = localStorage.getItem('projects');
     let allProjects: Project[] = [];
@@ -79,6 +83,7 @@ export const TimeTracker = () => {
       try {
         const projects = JSON.parse(savedProjects);
         allProjects = [...projects];
+        console.log('Loaded saved projects:', projects);
       } catch (error) {
         console.error('Error loading saved projects:', error);
       }
@@ -91,23 +96,25 @@ export const TimeTracker = () => {
         if (data.projects) {
           const existingNames = new Set(allProjects.map(p => p.name.toLowerCase().trim()));
           const strategyProjects = data.projects
-            .filter((p: any) => p.name.trim() !== '')
+            .filter((p: any) => p.name && p.name.trim() !== '')
             .filter((p: any) => !existingNames.has(p.name.toLowerCase().trim()))
             .map((p: any, index: number) => ({
               id: Date.now() + index,
               name: p.name,
-              lifeArea: p.lifeArea,
+              lifeArea: p.lifeArea || 'Personal Growth',
               tasks: [],
               investedHours: 0,
               spentHours: 0
             }));
           allProjects = [...allProjects, ...strategyProjects];
+          console.log('Added strategy projects:', strategyProjects);
         }
       } catch (error) {
         console.error('Error loading strategy projects:', error);
       }
     }
 
+    console.log('Final projects array:', allProjects);
     setProjects(allProjects);
   };
 
@@ -288,17 +295,12 @@ export const TimeTracker = () => {
 
   // Handle project change - clear task if it doesn't exist in new project
   const handleProjectChange = (projectId: string) => {
+    console.log('handleProjectChange called with:', projectId);
     setSelectedProject(projectId);
-    
-    // Clear selected task when project changes
-    const newProject = projects.find(p => p.id.toString() === projectId);
-    if (newProject) {
-      const taskExists = newProject.tasks.some(t => t.id.toString() === selectedTask);
-      if (!taskExists) {
-        setSelectedTask('');
-      }
-    }
+    setSelectedTask(''); // Always clear task when project changes for simplicity
   };
+
+  console.log('About to render, selectedProjectData:', selectedProjectData);
 
   return (
     <div className="space-y-6">
@@ -343,7 +345,7 @@ export const TimeTracker = () => {
                   </SelectTrigger>
                   <SelectContent>
                     {projects.map((project) => (
-                      <SelectItem key={`project-select-${project.id}`} value={project.id.toString()}>
+                      <SelectItem key={project.id} value={project.id.toString()}>
                         {project.name} ({project.lifeArea})
                       </SelectItem>
                     ))}
@@ -361,7 +363,7 @@ export const TimeTracker = () => {
                     <SelectContent>
                       <SelectItem value="">General project work</SelectItem>
                       {availableTasks.map((task) => (
-                        <SelectItem key={`task-select-${task.id}`} value={task.id.toString()}>
+                        <SelectItem key={task.id} value={task.id.toString()}>
                           {task.name}
                         </SelectItem>
                       ))}
@@ -424,7 +426,7 @@ export const TimeTracker = () => {
                 <p className="text-slate-500 text-center py-4">No sessions logged today</p>
               ) : (
                 recentLogs.map((log, index) => (
-                  <div key={`log-${index}-${log.timestamp}`} className="flex justify-between items-center p-3 bg-slate-50 rounded-lg">
+                  <div key={`${log.timestamp}-${index}`} className="flex justify-between items-center p-3 bg-slate-50 rounded-lg">
                     <div>
                       <div className="font-medium">{log.project}</div>
                       {log.task && <div className="text-sm text-slate-600">{log.task}</div>}
@@ -462,10 +464,8 @@ export const TimeTracker = () => {
               const totalInvested = taskInvested + projectInvested;
               const totalSpent = taskSpent + projectSpent;
               
-              console.log(`Project ${project.name}: taskInvested=${taskInvested}, projectInvested=${projectInvested}, totalInvested=${totalInvested}`);
-              
               return (
-                <div key={`summary-${project.id}`} className="p-4 border border-slate-200 rounded-lg">
+                <div key={project.id} className="p-4 border border-slate-200 rounded-lg">
                   <div className="font-medium mb-2">{project.name}</div>
                   <div className="text-sm text-slate-500 mb-3">{project.lifeArea}</div>
                   <div className="space-y-1">
