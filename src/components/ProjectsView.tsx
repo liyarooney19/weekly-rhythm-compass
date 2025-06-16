@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -8,7 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Plus, Trash2, Timer } from 'lucide-react';
+import { Plus, Trash2, Timer, Edit } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 interface Project {
@@ -40,11 +39,13 @@ export const ProjectsView = () => {
     description: '',
     lifeArea: 'Work / Career'
   });
+  const [editingProject, setEditingProject] = useState<Project | null>(null);
   const [newTask, setNewTask] = useState({
     name: '',
     estimatedHours: ''
   });
   const [newProjectDialog, setNewProjectDialog] = useState(false);
+  const [editProjectDialog, setEditProjectDialog] = useState(false);
   const { toast } = useToast();
 
   const lifeAreas = [
@@ -280,6 +281,35 @@ export const ProjectsView = () => {
     return tasks.reduce((sum, task) => sum + (task[type === 'invested' ? 'investedHours' : 'spentHours'] || 0), 0);
   };
 
+  const editProject = (project: Project) => {
+    setEditingProject({ ...project });
+    setEditProjectDialog(true);
+  };
+
+  const updateProject = () => {
+    if (!editingProject || !editingProject.name.trim()) {
+      toast({
+        title: "Error",
+        description: "Please enter a project name",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    const updatedProjects = projects.map(project => 
+      project.id === editingProject.id ? editingProject : project
+    );
+    saveProjects(updatedProjects);
+
+    setEditProjectDialog(false);
+    setEditingProject(null);
+
+    toast({
+      title: "Project Updated",
+      description: `${editingProject.name} has been updated`
+    });
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
@@ -332,6 +362,47 @@ export const ProjectsView = () => {
         </Dialog>
       </div>
 
+      {/* Edit Project Dialog */}
+      <Dialog open={editProjectDialog} onOpenChange={setEditProjectDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit Project</DialogTitle>
+          </DialogHeader>
+          {editingProject && (
+            <div className="space-y-4">
+              <Input
+                placeholder="Project name..."
+                value={editingProject.name}
+                onChange={(e) => setEditingProject({...editingProject, name: e.target.value})}
+              />
+              <Textarea
+                placeholder="Project description..."
+                value={editingProject.description}
+                onChange={(e) => setEditingProject({...editingProject, description: e.target.value})}
+              />
+              <Select value={editingProject.lifeArea} onValueChange={(value) => setEditingProject({...editingProject, lifeArea: value})}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select life area..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {lifeAreas.map(area => (
+                    <SelectItem key={area} value={area}>{area}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <div className="flex gap-2">
+                <Button onClick={updateProject} disabled={!editingProject.name.trim()}>
+                  Update Project
+                </Button>
+                <Button variant="outline" onClick={() => setEditProjectDialog(false)}>
+                  Cancel
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
       {/* Projects Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {projects.map((project) => {
@@ -355,6 +426,9 @@ export const ProjectsView = () => {
                     </Badge>
                   </div>
                   <div className="flex gap-2">
+                    <Button size="sm" variant="outline" onClick={() => editProject(project)}>
+                      <Edit className="h-4 w-4" />
+                    </Button>
                     <Dialog>
                       <DialogTrigger asChild>
                         <Button size="sm" variant="outline">

@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -24,6 +25,7 @@ export const StrategySession: React.FC<StrategySessionProps> = ({ setActiveView 
 
   const lifeAreas = [
     'Work / Career',
+    'Personal Growth',
     'Creative Projects', 
     'Health & Routines',
     'Relationships / Family',
