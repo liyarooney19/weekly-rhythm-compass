@@ -40,10 +40,24 @@ export const WeeklyPlanning = () => {
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [taskEstimatedHours, setTaskEstimatedHours] = useState('');
 
-  const formatHours = (hours: number | string) => {
-    const numHours = typeof hours === 'string' ? parseFloat(hours) : hours;
-    if (isNaN(numHours)) return 0;
+  const formatHours = (hours: number | string): number => {
+    const numHours = typeof hours === 'string' ? parseFloat(hours) || 0 : hours || 0;
     return Math.round(numHours * 10) / 10; // Round to 1 decimal place
+  };
+
+  const validateWeeklyTask = (task: any): WeeklyTask | null => {
+    if (!task || typeof task !== 'object') return null;
+    
+    return {
+      id: task.id || Date.now().toString(),
+      projectId: task.projectId || '',
+      taskId: task.taskId || '',
+      projectName: task.projectName || 'Unknown Project',
+      taskName: task.taskName || 'Unknown Task',
+      estimatedHours: formatHours(task.estimatedHours),
+      completed: Boolean(task.completed),
+      actualHours: formatHours(task.actualHours)
+    };
   };
 
   useEffect(() => {
@@ -56,46 +70,56 @@ export const WeeklyPlanning = () => {
     if (savedProjects) {
       try {
         const parsed = JSON.parse(savedProjects);
-        setProjects(Array.isArray(parsed) ? parsed : []);
+        if (Array.isArray(parsed)) {
+          setProjects(parsed.filter(p => p && p.name && p.name.trim()));
+        }
       } catch (error) {
         console.error('Error parsing projects:', error);
         setProjects([]);
       }
     }
 
-    // Load weekly tasks
+    // Load weekly tasks with validation
     const savedWeeklyTasks = localStorage.getItem('weeklyTasks');
     if (savedWeeklyTasks) {
       try {
         const parsed = JSON.parse(savedWeeklyTasks);
-        const validatedTasks = Array.isArray(parsed) ? parsed.map(task => ({
-          ...task,
-          estimatedHours: formatHours(task.estimatedHours || 0),
-          actualHours: formatHours(task.actualHours || 0)
-        })) : [];
-        setWeeklyTasks(validatedTasks);
+        if (Array.isArray(parsed)) {
+          const validTasks = parsed
+            .map(validateWeeklyTask)
+            .filter(task => task !== null && task.taskName.trim() !== '')
+            .filter(task => task !== null) as WeeklyTask[];
+          
+          setWeeklyTasks(validTasks);
+          
+          // If we had to clean up tasks, save the cleaned version
+          if (validTasks.length !== parsed.length) {
+            localStorage.setItem('weeklyTasks', JSON.stringify(validTasks));
+          }
+        }
       } catch (error) {
         console.error('Error parsing weekly tasks:', error);
         setWeeklyTasks([]);
+        localStorage.removeItem('weeklyTasks'); // Clear corrupted data
       }
     }
   };
 
   const saveWeeklyTasks = (tasks: WeeklyTask[]) => {
-    localStorage.setItem('weeklyTasks', JSON.stringify(tasks));
+    const validTasks = tasks.filter(task => task && task.taskName && task.taskName.trim());
+    setWeeklyTasks(validTasks);
+    localStorage.setItem('weeklyTasks', JSON.stringify(validTasks));
   };
 
   const toggleTaskCompletion = (taskId: string) => {
     const updatedTasks = weeklyTasks.map(task =>
       task.id === taskId ? { ...task, completed: !task.completed } : task
     );
-    setWeeklyTasks(updatedTasks);
     saveWeeklyTasks(updatedTasks);
   };
 
   const removeTaskFromWeek = (taskId: string) => {
     const updatedTasks = weeklyTasks.filter(task => task.id !== taskId);
-    setWeeklyTasks(updatedTasks);
     saveWeeklyTasks(updatedTasks);
   };
 
@@ -109,9 +133,18 @@ export const WeeklyPlanning = () => {
       return;
     }
 
+    if (!selectedProject.name.trim() || !selectedTask.name.trim()) {
+      toast({
+        title: "Error",
+        description: "Invalid project or task selected",
+        variant: "destructive"
+      });
+      return;
+    }
+
     const estimatedHours = formatHours(taskEstimatedHours || 0);
 
-    const newTask = {
+    const newTask: WeeklyTask = {
       id: Date.now().toString(),
       projectId: selectedProject.id,
       taskId: selectedTask.id,
@@ -123,7 +156,6 @@ export const WeeklyPlanning = () => {
     };
 
     const updatedTasks = [...weeklyTasks, newTask];
-    setWeeklyTasks(updatedTasks);
     saveWeeklyTasks(updatedTasks);
 
     // Reset selections
@@ -144,7 +176,6 @@ export const WeeklyPlanning = () => {
         ? { ...task, actualHours: numericHours }
         : task
     );
-    setWeeklyTasks(updatedTasks);
     saveWeeklyTasks(updatedTasks);
   };
 
@@ -155,7 +186,6 @@ export const WeeklyPlanning = () => {
         ? { ...task, estimatedHours: numericHours }
         : task
     );
-    setWeeklyTasks(updatedTasks);
     saveWeeklyTasks(updatedTasks);
   };
 
@@ -238,11 +268,13 @@ export const WeeklyPlanning = () => {
                   <SelectValue placeholder="Choose a project..." />
                 </SelectTrigger>
                 <SelectContent>
-                  {projects.filter(p => p.status === 'active' || !p.status).map(project => (
-                    <SelectItem key={project.id} value={project.id}>
-                      {project.name}
-                    </SelectItem>
-                  ))}
+                  {projects
+                    .filter(p => (p.status === 'active' || !p.status) && p.name && p.name.trim())
+                    .map(project => (
+                      <SelectItem key={project.id} value={project.id}>
+                        {project.name}
+                      </SelectItem>
+                    ))}
                 </SelectContent>
               </Select>
             </div>
@@ -261,11 +293,13 @@ export const WeeklyPlanning = () => {
                   <SelectValue placeholder="Choose a task..." />
                 </SelectTrigger>
                 <SelectContent>
-                  {selectedProject?.tasks?.map(task => (
-                    <SelectItem key={task.id} value={task.id}>
-                      {task.name}
-                    </SelectItem>
-                  )) || []}
+                  {selectedProject?.tasks
+                    ?.filter(task => task.name && task.name.trim())
+                    .map(task => (
+                      <SelectItem key={task.id} value={task.id}>
+                        {task.name}
+                      </SelectItem>
+                    )) || []}
                 </SelectContent>
               </Select>
             </div>
@@ -312,7 +346,7 @@ export const WeeklyPlanning = () => {
                 <div key={task.id} className="flex items-center gap-4 p-4 border rounded-lg">
                   <Checkbox 
                     checked={task.completed}
-                    onCheckedChange={(checked) => toggleTaskCompletion(task.id)}
+                    onCheckedChange={() => toggleTaskCompletion(task.id)}
                   />
                   <div className="flex-1">
                     <div className={`font-medium ${task.completed ? 'line-through text-slate-500' : ''}`}>

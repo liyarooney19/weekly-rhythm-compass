@@ -2,524 +2,316 @@
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { Textarea } from '@/components/ui/textarea';
+import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
-import { Checkbox } from '@/components/ui/checkbox';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Calendar, CheckCircle2, Clock, ChevronDown, ChevronRight, Target, FileText, Timer, Settings2, Plus, Edit, Trash2 } from 'lucide-react';
+import { Calendar, Target, CheckCircle, Plus, Edit, Save, X } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
-interface WeeklySession {
+interface WeeklyGoal {
   id: string;
-  date: string;
+  text: string;
   completed: boolean;
-  completedItems: string[];
-  notes: Record<string, string>;
+  category: string;
 }
 
-interface AgendaItem {
-  id: string;
-  title: string;
-  icon: any;
-  description: string;
+interface WeeklyReflection {
+  wins: string;
+  challenges: string;
+  learnings: string;
+  nextWeekFocus: string;
 }
 
 export const WeeklyStrategyHub = () => {
   const { toast } = useToast();
-  const [strategyDay, setStrategyDay] = useState('Sunday');
-  const [currentSession, setCurrentSession] = useState<WeeklySession>({
-    id: '',
-    date: '',
-    completed: false,
-    completedItems: [],
-    notes: {}
+  const [goals, setGoals] = useState<WeeklyGoal[]>([]);
+  const [reflection, setReflection] = useState<WeeklyReflection>({
+    wins: '',
+    challenges: '',
+    learnings: '',
+    nextWeekFocus: ''
   });
-  const [sessionHistory, setSessionHistory] = useState<WeeklySession[]>([]);
-  const [openSections, setOpenSections] = useState<string[]>(['notesReview']);
-  const [agendaItems, setAgendaItems] = useState<AgendaItem[]>([]);
-  const [editAgendaDialog, setEditAgendaDialog] = useState(false);
-  const [newAgendaItem, setNewAgendaItem] = useState({ title: '', description: '' });
-
-  const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-
-  const defaultAgendaItems = [
-    {
-      id: 'notesReview',
-      title: 'Review and clean up notes and drafts',
-      icon: FileText,
-      description: 'Go through your notes, organize thoughts, clean up drafts'
-    },
-    {
-      id: 'dissatisfactionsUpdate',
-      title: 'Update list of dissatisfactions',
-      icon: Target,
-      description: 'Reflect on current dissatisfactions, add new ones, resolve completed ones'
-    },
-    {
-      id: 'prioritiesAdjustment',
-      title: 'Adjust priorities of current projects',
-      icon: Settings2,
-      description: 'Review project priorities based on recent progress and changing circumstances'
-    },
-    {
-      id: 'timeReflection',
-      title: 'Reflect on time spent/invested last week',
-      icon: Clock,
-      description: 'Analyze how time was allocated, identify patterns and improvements'
-    },
-    {
-      id: 'tasksPlanning',
-      title: 'Adjust project tasks for coming week',
-      icon: CheckCircle2,
-      description: 'Plan specific tasks and deliverables for the upcoming week'
-    },
-    {
-      id: 'pomodoroPlanning',
-      title: 'Plan in Pomodoro tracker and assign time estimates',
-      icon: Timer,
-      description: 'Allocate time blocks and estimate effort for planned tasks'
-    }
-  ];
+  const [newGoal, setNewGoal] = useState('');
+  const [editingGoal, setEditingGoal] = useState<string | null>(null);
+  const [editGoalText, setEditGoalText] = useState('');
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    loadData();
-    initializeCurrentSession();
+    loadWeeklyData();
   }, []);
 
-  // Save progress whenever session changes
-  useEffect(() => {
-    if (currentSession.id) {
-      localStorage.setItem('currentWeeklySession', JSON.stringify(currentSession));
-    }
-  }, [currentSession]);
-
-  const loadData = () => {
-    const savedStrategyDay = localStorage.getItem('weeklyStrategyDay');
-    if (savedStrategyDay) {
-      setStrategyDay(savedStrategyDay);
-    }
-
-    const savedHistory = localStorage.getItem('weeklyStrategyHistory');
-    if (savedHistory) {
-      try {
-        const parsedHistory = JSON.parse(savedHistory);
-        setSessionHistory(Array.isArray(parsedHistory) ? parsedHistory : []);
-      } catch (error) {
-        console.error('Error parsing session history:', error);
-        setSessionHistory([]);
-      }
-    }
-
-    const savedAgenda = localStorage.getItem('weeklyAgendaItems');
-    if (savedAgenda) {
-      try {
-        const parsedAgenda = JSON.parse(savedAgenda);
-        setAgendaItems(Array.isArray(parsedAgenda) ? parsedAgenda : defaultAgendaItems);
-      } catch (error) {
-        console.error('Error parsing agenda items:', error);
-        setAgendaItems(defaultAgendaItems);
-      }
-    } else {
-      setAgendaItems(defaultAgendaItems);
-    }
-
-    const savedCurrentSession = localStorage.getItem('currentWeeklySession');
-    if (savedCurrentSession) {
-      try {
-        const parsed = JSON.parse(savedCurrentSession);
-        const currentWeek = getWeekId(new Date());
-        if (parsed.id === currentWeek && !parsed.completed) {
-          setCurrentSession({
-            ...parsed,
-            completedItems: Array.isArray(parsed.completedItems) ? parsed.completedItems : [],
-            notes: parsed.notes && typeof parsed.notes === 'object' ? parsed.notes : {}
-          });
-          return;
+  const loadWeeklyData = () => {
+    try {
+      // Load goals
+      const savedGoals = localStorage.getItem('weeklyGoals');
+      if (savedGoals) {
+        const parsed = JSON.parse(savedGoals);
+        if (Array.isArray(parsed)) {
+          setGoals(parsed);
         }
-      } catch (error) {
-        console.error('Error parsing current session:', error);
       }
+
+      // Load reflection
+      const savedReflection = localStorage.getItem('weeklyReflection');
+      if (savedReflection) {
+        const parsed = JSON.parse(savedReflection);
+        if (parsed && typeof parsed === 'object') {
+          setReflection({
+            wins: parsed.wins || '',
+            challenges: parsed.challenges || '',
+            learnings: parsed.learnings || '',
+            nextWeekFocus: parsed.nextWeekFocus || ''
+          });
+        }
+      }
+    } catch (error) {
+      console.error('Error loading weekly data:', error);
+    } finally {
+      setIsLoading(false);
     }
   };
 
-  const initializeCurrentSession = () => {
-    const today = new Date();
-    const currentWeek = getWeekId(today);
-    
-    const newSession = {
-      id: currentWeek,
-      date: today.toISOString(),
+  const saveGoals = (updatedGoals: WeeklyGoal[]) => {
+    setGoals(updatedGoals);
+    localStorage.setItem('weeklyGoals', JSON.stringify(updatedGoals));
+  };
+
+  const saveReflection = (updatedReflection: WeeklyReflection) => {
+    setReflection(updatedReflection);
+    localStorage.setItem('weeklyReflection', JSON.stringify(updatedReflection));
+  };
+
+  const addGoal = () => {
+    if (!newGoal.trim()) return;
+
+    const goal: WeeklyGoal = {
+      id: Date.now().toString(),
+      text: newGoal.trim(),
       completed: false,
-      completedItems: [],
-      notes: {}
+      category: 'General'
     };
 
-    setCurrentSession(newSession);
+    const updatedGoals = [...goals, goal];
+    saveGoals(updatedGoals);
+    setNewGoal('');
+
+    toast({
+      title: "Goal Added",
+      description: "Your weekly goal has been added"
+    });
   };
 
-  const getWeekId = (date: Date) => {
-    const startOfYear = new Date(date.getFullYear(), 0, 1);
-    const days = Math.floor((date.getTime() - startOfYear.getTime()) / (24 * 60 * 60 * 1000));
-    const weekNumber = Math.ceil((days + startOfYear.getDay() + 1) / 7);
-    return `${date.getFullYear()}-W${weekNumber}`;
-  };
-
-  const isSessionDue = () => {
-    const today = new Date();
-    const dayIndex = today.getDay();
-    const targetDayIndex = days.indexOf(strategyDay);
-    return dayIndex === targetDayIndex;
-  };
-
-  const getNextSessionDate = () => {
-    const today = new Date();
-    const targetDayIndex = days.indexOf(strategyDay);
-    const todayIndex = today.getDay();
-    const daysUntil = (targetDayIndex - todayIndex + 7) % 7;
-    const nextSession = new Date(today);
-    nextSession.setDate(today.getDate() + (daysUntil === 0 ? 7 : daysUntil));
-    return nextSession.toLocaleDateString();
-  };
-
-  const toggleSection = (sectionId: string) => {
-    setOpenSections(prev => 
-      prev.includes(sectionId) 
-        ? prev.filter(id => id !== sectionId)
-        : [...prev, sectionId]
+  const toggleGoal = (goalId: string) => {
+    const updatedGoals = goals.map(goal =>
+      goal.id === goalId ? { ...goal, completed: !goal.completed } : goal
     );
+    saveGoals(updatedGoals);
   };
 
-  const updateNote = (noteType: string, value: string) => {
-    const updatedSession = {
-      ...currentSession,
-      notes: {
-        ...currentSession.notes,
-        [noteType]: value
-      }
-    };
-    setCurrentSession(updatedSession);
+  const startEditGoal = (goal: WeeklyGoal) => {
+    setEditingGoal(goal.id);
+    setEditGoalText(goal.text);
   };
 
-  const toggleItemCompletion = (itemId: string) => {
-    const updatedSession = {
-      ...currentSession,
-      completedItems: currentSession.completedItems.includes(itemId)
-        ? currentSession.completedItems.filter(id => id !== itemId)
-        : [...currentSession.completedItems, itemId]
-    };
-    setCurrentSession(updatedSession);
+  const saveEditGoal = () => {
+    if (!editGoalText.trim() || !editingGoal) return;
+
+    const updatedGoals = goals.map(goal =>
+      goal.id === editingGoal ? { ...goal, text: editGoalText.trim() } : goal
+    );
+    saveGoals(updatedGoals);
+    setEditingGoal(null);
+    setEditGoalText('');
   };
 
-  const saveStrategyDay = (day: string) => {
-    setStrategyDay(day);
-    localStorage.setItem('weeklyStrategyDay', day);
-    toast({
-      title: "Strategy Day Updated",
-      description: `Your weekly strategy session is now scheduled for ${day}s`
-    });
+  const cancelEditGoal = () => {
+    setEditingGoal(null);
+    setEditGoalText('');
   };
 
-  const completeSession = () => {
-    const completedSession = {
-      ...currentSession,
-      completed: true,
-      date: new Date().toISOString()
-    };
-
-    const updatedHistory = [completedSession, ...sessionHistory];
-    setSessionHistory(updatedHistory);
-    localStorage.setItem('weeklyStrategyHistory', JSON.stringify(updatedHistory));
-    localStorage.removeItem('currentWeeklySession');
-
-    toast({
-      title: "Weekly Strategy Session Completed",
-      description: "Great job! Your session has been saved to history."
-    });
-
-    // Reset for next session
-    initializeCurrentSession();
-    setOpenSections(['notesReview']);
+  const deleteGoal = (goalId: string) => {
+    const updatedGoals = goals.filter(goal => goal.id !== goalId);
+    saveGoals(updatedGoals);
   };
 
   const getCompletionPercentage = () => {
-    if (!agendaItems || agendaItems.length === 0) return 0;
-    return Math.round((currentSession.completedItems.length / agendaItems.length) * 100);
+    if (goals.length === 0) return 0;
+    const completed = goals.filter(goal => goal.completed).length;
+    return Math.round((completed / goals.length) * 100);
   };
 
-  const allItemsCompleted = () => {
-    return agendaItems && agendaItems.length > 0 && currentSession.completedItems.length === agendaItems.length;
-  };
-
-  const saveAgendaItems = (items: AgendaItem[]) => {
-    setAgendaItems(items);
-    localStorage.setItem('weeklyAgendaItems', JSON.stringify(items));
-  };
-
-  const addAgendaItem = () => {
-    if (!newAgendaItem.title.trim()) {
-      toast({
-        title: "Error",
-        description: "Please enter an agenda item title",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    const newItem: AgendaItem = {
-      id: `custom_${Date.now()}`,
-      title: newAgendaItem.title.trim(),
-      description: newAgendaItem.description.trim(),
-      icon: Target
-    };
-
-    const updatedItems = [...agendaItems, newItem];
-    saveAgendaItems(updatedItems);
-
-    setNewAgendaItem({ title: '', description: '' });
-    toast({
-      title: "Agenda Item Added",
-      description: "New item has been added to your weekly agenda"
-    });
-  };
-
-  const deleteAgendaItem = (itemId: string) => {
-    const updatedItems = agendaItems.filter(item => item.id !== itemId);
-    saveAgendaItems(updatedItems);
-
-    // Remove from current session if it exists
-    const updatedSession = {
-      ...currentSession,
-      completedItems: currentSession.completedItems.filter(id => id !== itemId),
-      notes: Object.fromEntries(
-        Object.entries(currentSession.notes).filter(([key]) => key !== itemId)
-      )
-    };
-    setCurrentSession(updatedSession);
-
-    toast({
-      title: "Agenda Item Deleted",
-      description: "Item has been removed from your weekly agenda"
-    });
-  };
+  if (isLoading) {
+    return (
+      <div className="space-y-6">
+        <div className="text-center py-8">
+          <div className="text-lg">Loading weekly strategy...</div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold text-slate-800 mb-2">Weekly Strategy Hub</h1>
-          <p className="text-slate-600">Your recurring weekly strategy and planning session</p>
-        </div>
-        {isSessionDue() && (
-          <Badge variant="default" className="bg-green-600">
-            <Calendar className="h-4 w-4 mr-1" />
-            Session Due Today
-          </Badge>
-        )}
+      <div>
+        <h1 className="text-3xl font-bold text-slate-800 mb-2">Weekly Strategy Hub</h1>
+        <p className="text-slate-600">Set goals, track progress, and reflect on your week</p>
       </div>
 
-      {/* Strategy Day Configuration */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Calendar className="h-5 w-5" />
-            Strategy Day Configuration
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="flex items-center gap-4">
-            <div className="flex items-center gap-2">
-              <span className="text-sm font-medium">Weekly Strategy Day:</span>
-              <Select value={strategyDay} onValueChange={saveStrategyDay}>
-                <SelectTrigger className="w-32">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {days.map(day => (
-                    <SelectItem key={day} value={day}>{day}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            {!isSessionDue() && (
-              <div className="text-sm text-slate-500">
-                Next session: {getNextSessionDate()}
-              </div>
-            )}
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Manage Agenda */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center justify-between">
-            <span>Manage Weekly Agenda</span>
-            <Dialog open={editAgendaDialog} onOpenChange={setEditAgendaDialog}>
-              <DialogTrigger asChild>
-                <Button variant="outline" size="sm">
-                  <Edit className="h-4 w-4 mr-2" />
-                  Edit Agenda
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="max-w-2xl">
-                <DialogHeader>
-                  <DialogTitle>Edit Weekly Strategy Agenda</DialogTitle>
-                </DialogHeader>
-                <div className="space-y-4 max-h-96 overflow-y-auto">
-                  {agendaItems.map((item) => (
-                    <div key={item.id} className="flex items-start gap-3 p-3 border rounded-lg">
-                      <div className="flex-1">
-                        <div className="font-medium">{item.title}</div>
-                        <div className="text-sm text-slate-500">{item.description}</div>
-                      </div>
-                      <Button 
-                        size="sm" 
-                        variant="outline"
-                        onClick={() => deleteAgendaItem(item.id)}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  ))}
-                  
-                  <div className="border-t pt-4">
-                    <h4 className="font-medium mb-3">Add New Agenda Item</h4>
-                    <div className="space-y-3">
-                      <Input
-                        placeholder="Agenda item title..."
-                        value={newAgendaItem.title}
-                        onChange={(e) => setNewAgendaItem({...newAgendaItem, title: e.target.value})}
-                      />
-                      <Textarea
-                        placeholder="Description..."
-                        value={newAgendaItem.description}
-                        onChange={(e) => setNewAgendaItem({...newAgendaItem, description: e.target.value})}
-                      />
-                      <Button onClick={addAgendaItem} disabled={!newAgendaItem.title.trim()}>
-                        <Plus className="h-4 w-4 mr-2" />
-                        Add Item
-                      </Button>
-                    </div>
-                  </div>
-                </div>
-              </DialogContent>
-            </Dialog>
-          </CardTitle>
-        </CardHeader>
-      </Card>
-
-      {/* Current Session Progress */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center justify-between">
-            <span>Current Session Progress</span>
-            <span className="text-lg font-bold">{getCompletionPercentage()}%</span>
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <Progress value={getCompletionPercentage()} className="mb-4" />
-          <div className="flex justify-between items-center">
-            <span className="text-sm text-slate-600">
-              {currentSession.completedItems.length} of {agendaItems.length} items completed
-            </span>
-            <Button 
-              onClick={completeSession}
-              disabled={!allItemsCompleted()}
-              className="bg-green-600 hover:bg-green-700"
-            >
-              Complete Session
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Weekly Strategy Agenda */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Weekly Strategy Agenda</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {agendaItems.map(item => {
-            const Icon = item.icon;
-            const isOpen = openSections.includes(item.id);
-            const isCompleted = currentSession.completedItems.includes(item.id);
-
-            return (
-              <div key={item.id} className="border rounded-lg">
-                <div className="flex items-center gap-3 p-4">
-                  <Checkbox 
-                    checked={isCompleted}
-                    onCheckedChange={() => toggleItemCompletion(item.id)}
-                  />
-                  <Collapsible open={isOpen} onOpenChange={() => toggleSection(item.id)} className="flex-1">
-                    <CollapsibleTrigger asChild>
-                      <Button variant="ghost" className="w-full justify-between p-0 h-auto">
-                        <div className="flex items-center gap-3">
-                          <Icon className={`h-5 w-5 ${isCompleted ? 'text-green-600' : 'text-slate-400'}`} />
-                          <div className="text-left">
-                            <div className={`font-medium ${isCompleted ? 'line-through text-slate-500' : ''}`}>
-                              {item.title}
-                            </div>
-                            <div className="text-sm text-slate-500">{item.description}</div>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          {isCompleted && <CheckCircle2 className="h-4 w-4 text-green-600" />}
-                          {isOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-                        </div>
-                      </Button>
-                    </CollapsibleTrigger>
-                    <CollapsibleContent className="px-0 pb-4">
-                      <Textarea
-                        placeholder={`Notes for: ${item.title}`}
-                        value={currentSession.notes[item.id] || ''}
-                        onChange={(e) => updateNote(item.id, e.target.value)}
-                        className="min-h-[120px] mt-3"
-                      />
-                    </CollapsibleContent>
-                  </Collapsible>
-                </div>
-              </div>
-            );
-          })}
-        </CardContent>
-      </Card>
-
-      {/* Session History */}
-      {sessionHistory.length > 0 && (
+      {/* Weekly Progress Overview */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <Card>
-          <CardHeader>
-            <CardTitle>Session History</CardTitle>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Weekly Goals</CardTitle>
+            <Target className="h-4 w-4 text-slate-500" />
           </CardHeader>
           <CardContent>
-            <div className="space-y-2">
-              {sessionHistory.slice(0, 5).map((session, index) => (
-                <div key={session.id} className="flex items-center justify-between p-3 border rounded-lg">
-                  <div className="flex items-center gap-3">
-                    <CheckCircle2 className="h-4 w-4 text-green-600" />
-                    <div>
-                      <div className="font-medium">Week {session.id}</div>
-                      <div className="text-sm text-slate-500">
-                        {new Date(session.date).toLocaleDateString()}
-                      </div>
-                    </div>
-                  </div>
-                  <Badge variant="secondary">Completed</Badge>
-                </div>
-              ))}
-              {sessionHistory.length > 5 && (
-                <div className="text-sm text-slate-500 text-center pt-2">
-                  ... and {sessionHistory.length - 5} more sessions
-                </div>
-              )}
-            </div>
+            <div className="text-2xl font-bold">{goals.length}</div>
+            <p className="text-xs text-slate-500">Total goals set</p>
           </CardContent>
         </Card>
-      )}
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Completed</CardTitle>
+            <CheckCircle className="h-4 w-4 text-slate-500" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{goals.filter(g => g.completed).length}</div>
+            <p className="text-xs text-slate-500">Goals achieved</p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Progress</CardTitle>
+            <Calendar className="h-4 w-4 text-slate-500" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{getCompletionPercentage()}%</div>
+            <p className="text-xs text-slate-500">Week completion</p>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Weekly Goals */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Weekly Goals</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex gap-2">
+            <Input
+              placeholder="Add a new weekly goal..."
+              value={newGoal}
+              onChange={(e) => setNewGoal(e.target.value)}
+              onKeyPress={(e) => e.key === 'Enter' && addGoal()}
+            />
+            <Button onClick={addGoal} disabled={!newGoal.trim()}>
+              <Plus className="h-4 w-4 mr-2" />
+              Add Goal
+            </Button>
+          </div>
+
+          {goals.length > 0 && (
+            <div className="space-y-2">
+              <Progress value={getCompletionPercentage()} className="w-full" />
+              <p className="text-sm text-slate-600">
+                {goals.filter(g => g.completed).length} of {goals.length} goals completed
+              </p>
+            </div>
+          )}
+
+          <div className="space-y-2">
+            {goals.map((goal) => (
+              <div key={goal.id} className="flex items-center gap-3 p-3 border rounded-lg">
+                <input
+                  type="checkbox"
+                  checked={goal.completed}
+                  onChange={() => toggleGoal(goal.id)}
+                  className="h-4 w-4"
+                />
+                {editingGoal === goal.id ? (
+                  <div className="flex-1 flex gap-2">
+                    <Input
+                      value={editGoalText}
+                      onChange={(e) => setEditGoalText(e.target.value)}
+                      onKeyPress={(e) => e.key === 'Enter' && saveEditGoal()}
+                    />
+                    <Button size="sm" onClick={saveEditGoal}>
+                      <Save className="h-3 w-3" />
+                    </Button>
+                    <Button size="sm" variant="outline" onClick={cancelEditGoal}>
+                      <X className="h-3 w-3" />
+                    </Button>
+                  </div>
+                ) : (
+                  <>
+                    <span className={`flex-1 ${goal.completed ? 'line-through text-slate-500' : ''}`}>
+                      {goal.text}
+                    </span>
+                    <Button size="sm" variant="outline" onClick={() => startEditGoal(goal)}>
+                      <Edit className="h-3 w-3" />
+                    </Button>
+                    <Button size="sm" variant="outline" onClick={() => deleteGoal(goal.id)}>
+                      <X className="h-3 w-3" />
+                    </Button>
+                  </>
+                )}
+              </div>
+            ))}
+          </div>
+
+          {goals.length === 0 && (
+            <div className="text-center py-8 text-slate-500">
+              <Target className="h-12 w-12 mx-auto mb-4 text-slate-300" />
+              <p>No weekly goals set yet.</p>
+              <p className="text-sm">Add your first goal above to get started.</p>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Weekly Reflection */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Weekly Reflection</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div>
+            <label className="text-sm font-medium mb-2 block">This Week's Wins</label>
+            <Textarea
+              placeholder="What went well this week?"
+              value={reflection.wins}
+              onChange={(e) => saveReflection({ ...reflection, wins: e.target.value })}
+            />
+          </div>
+          <div>
+            <label className="text-sm font-medium mb-2 block">Challenges Faced</label>
+            <Textarea
+              placeholder="What challenges did you encounter?"
+              value={reflection.challenges}
+              onChange={(e) => saveReflection({ ...reflection, challenges: e.target.value })}
+            />
+          </div>
+          <div>
+            <label className="text-sm font-medium mb-2 block">Key Learnings</label>
+            <Textarea
+              placeholder="What did you learn this week?"
+              value={reflection.learnings}
+              onChange={(e) => saveReflection({ ...reflection, learnings: e.target.value })}
+            />
+          </div>
+          <div>
+            <label className="text-sm font-medium mb-2 block">Next Week's Focus</label>
+            <Textarea
+              placeholder="What will you focus on next week?"
+              value={reflection.nextWeekFocus}
+              onChange={(e) => saveReflection({ ...reflection, nextWeekFocus: e.target.value })}
+            />
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 };
