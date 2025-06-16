@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -85,60 +86,77 @@ export const WeeklyStrategyHub = () => {
   ];
 
   useEffect(() => {
-    loadData();
-    initializeCurrentSession();
+    try {
+      loadData();
+      initializeCurrentSession();
+    } catch (error) {
+      console.error('Error initializing WeeklyStrategyHub:', error);
+    }
   }, []);
 
   // Save progress whenever session changes
   useEffect(() => {
     if (currentSession.id) {
-      localStorage.setItem('currentWeeklySession', JSON.stringify(currentSession));
+      try {
+        localStorage.setItem('currentWeeklySession', JSON.stringify(currentSession));
+      } catch (error) {
+        console.error('Error saving current session:', error);
+      }
     }
   }, [currentSession]);
 
   const loadData = () => {
-    const savedStrategyDay = localStorage.getItem('weeklyStrategyDay');
-    if (savedStrategyDay) {
-      setStrategyDay(savedStrategyDay);
-    }
-
-    const savedHistory = localStorage.getItem('weeklyStrategyHistory');
-    if (savedHistory) {
-      setSessionHistory(JSON.parse(savedHistory));
-    }
-
-    const savedAgenda = localStorage.getItem('weeklyAgendaItems');
-    if (savedAgenda) {
-      setAgendaItems(JSON.parse(savedAgenda));
-    } else {
-      setAgendaItems(defaultAgendaItems);
-    }
-
-    const savedCurrentSession = localStorage.getItem('currentWeeklySession');
-    if (savedCurrentSession) {
-      const parsed = JSON.parse(savedCurrentSession);
-      const currentWeek = getWeekId(new Date());
-      if (parsed.id === currentWeek && !parsed.completed) {
-        setCurrentSession(parsed);
-        return;
+    try {
+      const savedStrategyDay = localStorage.getItem('weeklyStrategyDay');
+      if (savedStrategyDay) {
+        setStrategyDay(savedStrategyDay);
       }
+
+      const savedHistory = localStorage.getItem('weeklyStrategyHistory');
+      if (savedHistory) {
+        setSessionHistory(JSON.parse(savedHistory));
+      }
+
+      const savedAgenda = localStorage.getItem('weeklyAgendaItems');
+      if (savedAgenda) {
+        setAgendaItems(JSON.parse(savedAgenda));
+      } else {
+        setAgendaItems(defaultAgendaItems);
+      }
+
+      const savedCurrentSession = localStorage.getItem('currentWeeklySession');
+      if (savedCurrentSession) {
+        const parsed = JSON.parse(savedCurrentSession);
+        const currentWeek = getWeekId(new Date());
+        if (parsed.id === currentWeek && !parsed.completed) {
+          setCurrentSession(parsed);
+          return;
+        }
+      }
+    } catch (error) {
+      console.error('Error loading data:', error);
+      setAgendaItems(defaultAgendaItems);
     }
   };
 
   const initializeCurrentSession = () => {
-    const today = new Date();
-    const currentWeek = getWeekId(today);
-    
-    const newSession = {
-      id: currentWeek,
-      date: today.toISOString(),
-      completed: false,
-      completedItems: [],
-      notes: {}
-    };
+    try {
+      const today = new Date();
+      const currentWeek = getWeekId(today);
+      
+      const newSession = {
+        id: currentWeek,
+        date: today.toISOString(),
+        completed: false,
+        completedItems: [],
+        notes: {}
+      };
 
-    setCurrentSession(newSession);
-    localStorage.setItem('currentWeeklySession', JSON.stringify(newSession));
+      setCurrentSession(newSession);
+      localStorage.setItem('currentWeeklySession', JSON.stringify(newSession));
+    } catch (error) {
+      console.error('Error initializing current session:', error);
+    }
   };
 
   const getWeekId = (date: Date) => {
@@ -182,7 +200,6 @@ export const WeeklyStrategyHub = () => {
       }
     };
     setCurrentSession(updatedSession);
-    localStorage.setItem('currentWeeklySession', JSON.stringify(updatedSession));
   };
 
   const toggleItemCompletion = (itemId: string) => {
@@ -193,7 +210,6 @@ export const WeeklyStrategyHub = () => {
         : [...currentSession.completedItems, itemId]
     };
     setCurrentSession(updatedSession);
-    localStorage.setItem('currentWeeklySession', JSON.stringify(updatedSession));
   };
 
   const saveStrategyDay = (day: string) => {
@@ -228,11 +244,12 @@ export const WeeklyStrategyHub = () => {
   };
 
   const getCompletionPercentage = () => {
+    if (agendaItems.length === 0) return 0;
     return Math.round((currentSession.completedItems.length / agendaItems.length) * 100);
   };
 
   const allItemsCompleted = () => {
-    return currentSession.completedItems.length === agendaItems.length;
+    return agendaItems.length > 0 && currentSession.completedItems.length === agendaItems.length;
   };
 
   const saveAgendaItems = (items: AgendaItem[]) => {
@@ -286,6 +303,19 @@ export const WeeklyStrategyHub = () => {
       description: "Item has been removed from your weekly agenda"
     });
   };
+
+  if (!agendaItems || agendaItems.length === 0) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold text-slate-800 mb-2">Weekly Strategy Hub</h1>
+            <p className="text-slate-600">Loading your weekly strategy session...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">

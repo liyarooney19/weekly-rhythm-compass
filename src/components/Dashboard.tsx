@@ -93,11 +93,10 @@ export const Dashboard = () => {
 
   const weeklyProgress = calculateWeeklyProgress();
 
-  // Get active projects with progress
+  // Get active projects with progress - show ALL active projects, not just 3
   const getActiveProjects = () => {
     return projects
       .filter(project => project.status === 'active' || !project.status) // Include projects without status for backward compatibility
-      .slice(0, 3)
       .map(project => ({
         name: project.name,
         hours: Math.round(project.investedHours || 0),
@@ -202,11 +201,11 @@ export const Dashboard = () => {
         </Card>
       </div>
 
-      {/* Project Progress */}
+      {/* Project Progress - Show all active projects */}
       {activeProjects.length > 0 && (
         <Card>
           <CardHeader>
-            <CardTitle>Active Projects</CardTitle>
+            <CardTitle>Active Projects ({activeProjects.length})</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
