@@ -6,7 +6,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Gamepad2, Plus, Calendar, Target, Clock } from 'lucide-react';
+import { Gamepad2, Plus, Calendar, Target, Clock, Trash2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 interface LeisureActivity {
@@ -356,6 +356,37 @@ export const LeisureTracker = () => {
     return totalTarget > 0 ? Math.round((totalCompleted / totalTarget) * 100) : 0;
   };
 
+  const deleteActivity = (id: number) => {
+    const activityToDelete = activities.find(a => a.id === id);
+    const updatedActivities = activities.filter(activity => activity.id !== id);
+    saveActivities(updatedActivities);
+
+    // Also remove from projects if it exists
+    if (activityToDelete) {
+      removeFromProjects(activityToDelete.name);
+    }
+
+    toast({
+      title: "Activity Deleted",
+      description: "Leisure activity has been removed"
+    });
+  };
+
+  const removeFromProjects = (activityName: string) => {
+    const savedProjects = localStorage.getItem('projects');
+    if (!savedProjects) return;
+
+    try {
+      const projects = JSON.parse(savedProjects);
+      const updatedProjects = projects.filter((project: any) => 
+        !(project.name.toLowerCase() === activityName.toLowerCase() && project.lifeArea === 'Leisure')
+      );
+      localStorage.setItem('projects', JSON.stringify(updatedProjects));
+    } catch (error) {
+      console.error('Error removing leisure project:', error);
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div>
@@ -439,9 +470,19 @@ export const LeisureTracker = () => {
                         <Badge variant="outline">{activity.frequency}</Badge>
                       </div>
                     </div>
-                    <div className="text-right text-sm text-slate-500">
-                      <div>{activity.totalHours.toFixed(1)}h total</div>
-                      <div>{activity.lastSession}</div>
+                    <div className="flex items-center gap-2">
+                      <div className="text-right text-sm text-slate-500">
+                        <div>{activity.totalHours.toFixed(1)}h total</div>
+                        <div>{activity.lastSession}</div>
+                      </div>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => deleteActivity(activity.id)}
+                        className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
                     </div>
                   </div>
                 </CardHeader>
