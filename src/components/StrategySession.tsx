@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -15,7 +14,7 @@ export const StrategySession: React.FC<StrategySessionProps> = ({ setActiveView 
   const [activeStep, setActiveStep] = useState(0);
   const [dissatisfactions, setDissatisfactions] = useState(['']);
   const [hypotheses, setHypotheses] = useState(['']);
-  const [projects, setProjects] = useState([{ name: '', description: '', lifeArea: 'Work / Career' }]);
+  const [projects, setProjects] = useState([{ name: '', description: '', lifeArea: 'Work / Career', status: 'active' }]);
 
   const steps = [
     { title: 'Current Dissatisfactions', icon: Target },
@@ -66,7 +65,7 @@ export const StrategySession: React.FC<StrategySessionProps> = ({ setActiveView 
   };
 
   const addProject = () => {
-    setProjects([...projects, { name: '', description: '', lifeArea: 'Work / Career' }]);
+    setProjects([...projects, { name: '', description: '', lifeArea: 'Work / Career', status: 'active' }]);
   };
 
   const updateProject = (index: number, field: string, value: string) => {

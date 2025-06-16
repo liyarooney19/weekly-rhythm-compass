@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -23,7 +24,7 @@ export const WeeklyPlanning = () => {
   const [tasks, setTasks] = useState<WeeklyTask[]>([]);
   const [newTask, setNewTask] = useState({ 
     title: '', 
-    estimatedHours: 1, 
+    estimatedHours: '1', 
     timeType: 'invested', 
     project: '',
     projectId: 0,
@@ -31,6 +32,7 @@ export const WeeklyPlanning = () => {
   });
   const [projects, setProjects] = useState<any[]>([]);
   const [selectedProject, setSelectedProject] = useState('');
+  const [selectedTask, setSelectedTask] = useState('');
   const { toast } = useToast();
 
   useEffect(() => {
@@ -76,11 +78,21 @@ export const WeeklyPlanning = () => {
       return;
     }
 
+    const estimatedHours = parseFloat(newTask.estimatedHours);
+    if (isNaN(estimatedHours) || estimatedHours <= 0) {
+      toast({
+        title: "Error",
+        description: "Please enter valid estimated hours",
+        variant: "destructive"
+      });
+      return;
+    }
+
     const task: WeeklyTask = { 
       id: Date.now(), 
       type: newTask.project ? 'project' : 'personal',
       title: newTask.title, 
-      estimatedHours: newTask.estimatedHours, 
+      estimatedHours: estimatedHours, 
       timeType: newTask.timeType as 'invested' | 'spent',
       project: newTask.project,
       projectId: newTask.projectId || undefined,
@@ -93,7 +105,7 @@ export const WeeklyPlanning = () => {
     
     setNewTask({ 
       title: '', 
-      estimatedHours: 1, 
+      estimatedHours: '1', 
       timeType: 'invested', 
       project: '',
       projectId: 0,
@@ -106,9 +118,18 @@ export const WeeklyPlanning = () => {
     });
   };
 
-  const addExistingTask = (projectId: string, taskId: string) => {
-    const project = projects.find(p => p.id.toString() === projectId);
-    const task = project?.tasks.find((t: any) => t.id.toString() === taskId);
+  const addExistingTask = () => {
+    if (!selectedProject || !selectedTask) {
+      toast({
+        title: "Error",
+        description: "Please select both project and task",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    const project = projects.find(p => p.id.toString() === selectedProject);
+    const task = project?.tasks.find((t: any) => t.id.toString() === selectedTask);
     
     if (!project || !task) return;
 
@@ -126,6 +147,9 @@ export const WeeklyPlanning = () => {
 
     const updatedTasks = [...tasks, weeklyTask];
     saveTasks(updatedTasks);
+    
+    setSelectedProject('');
+    setSelectedTask('');
     
     toast({
       title: "Success",
@@ -295,7 +319,7 @@ export const WeeklyPlanning = () => {
           <CardTitle>Add Existing Project Task</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <Select value={selectedProject} onValueChange={setSelectedProject}>
               <SelectTrigger>
                 <SelectValue placeholder="Select project..." />
@@ -309,31 +333,29 @@ export const WeeklyPlanning = () => {
               </SelectContent>
             </Select>
 
-            {selectedProjectData && availableTasks.length > 0 && (
-              <Select onValueChange={(taskId) => addExistingTask(selectedProject, taskId)}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select task..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {availableTasks.map((task: any) => (
-                    <SelectItem key={task.id} value={task.id.toString()}>
-                      {task.name} ({task.estimatedHours}h)
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            )}
+            <Select value={selectedTask} onValueChange={setSelectedTask} disabled={!selectedProject}>
+              <SelectTrigger>
+                <SelectValue placeholder="Select task..." />
+              </SelectTrigger>
+              <SelectContent>
+                {availableTasks.map((task: any) => (
+                  <SelectItem key={task.id} value={task.id.toString()}>
+                    {task.name} ({task.estimatedHours}h)
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
 
-            <Button 
-              disabled={!selectedProject || availableTasks.length === 0}
-              onClick={() => {
-                if (availableTasks.length > 0) {
-                  addExistingTask(selectedProject, availableTasks[0].id.toString());
-                }
-              }}
-            >
-              Add Selected Task
-            </Button>
+            <div className="col-span-2">
+              <Button 
+                onClick={addExistingTask}
+                disabled={!selectedProject || !selectedTask}
+                className="w-full"
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                Add Selected Task
+              </Button>
+            </div>
           </div>
         </CardContent>
       </Card>
@@ -352,9 +374,11 @@ export const WeeklyPlanning = () => {
             />
             <Input
               type="number"
-              placeholder="Hours"
+              placeholder="Hours (e.g., 1.5)"
               value={newTask.estimatedHours}
-              onChange={(e) => setNewTask({ ...newTask, estimatedHours: parseInt(e.target.value) || 1 })}
+              onChange={(e) => setNewTask({ ...newTask, estimatedHours: e.target.value })}
+              step="0.1"
+              min="0.1"
             />
             <select
               value={newTask.timeType}

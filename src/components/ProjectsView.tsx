@@ -15,7 +15,7 @@ interface Project {
   name: string;
   description: string;
   lifeArea: string;
-  status: 'planning' | 'active' | 'completed';
+  status: 'active' | 'postponed';
   progress: number;
   totalHours: number;
   investedHours?: number;
@@ -37,7 +37,8 @@ export const ProjectsView = () => {
   const [newProject, setNewProject] = useState({
     name: '',
     description: '',
-    lifeArea: 'Work / Career'
+    lifeArea: 'Work / Career',
+    status: 'active' as 'active' | 'postponed'
   });
   const [editingProject, setEditingProject] = useState<Project | null>(null);
   const [newTask, setNewTask] = useState({
@@ -91,7 +92,7 @@ export const ProjectsView = () => {
               name: p.name,
               description: p.description || '',
               lifeArea: p.lifeArea,
-              status: 'planning' as const,
+              status: 'active' as const,
               progress: 0,
               totalHours: 0,
               investedHours: 0,
@@ -128,7 +129,7 @@ export const ProjectsView = () => {
       name: newProject.name.trim(),
       description: newProject.description.trim(),
       lifeArea: newProject.lifeArea,
-      status: 'planning',
+      status: newProject.status,
       progress: 0,
       totalHours: 0,
       investedHours: 0,
@@ -142,7 +143,8 @@ export const ProjectsView = () => {
     setNewProject({
       name: '',
       description: '',
-      lifeArea: 'Work / Career'
+      lifeArea: 'Work / Career',
+      status: 'active'
     });
     setNewProjectDialog(false);
 
@@ -277,6 +279,10 @@ export const ProjectsView = () => {
     return colors[lifeArea as keyof typeof colors] || 'bg-slate-100 text-slate-800';
   };
 
+  const getStatusColor = (status: string) => {
+    return status === 'active' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800';
+  };
+
   const calculateTotalHours = (tasks: Task[], type: 'invested' | 'spent') => {
     return tasks.reduce((sum, task) => sum + (task[type === 'invested' ? 'investedHours' : 'spentHours'] || 0), 0);
   };
@@ -349,6 +355,15 @@ export const ProjectsView = () => {
                   ))}
                 </SelectContent>
               </Select>
+              <Select value={newProject.status} onValueChange={(value: 'active' | 'postponed') => setNewProject({...newProject, status: value})}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select status..." />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="active">Active</SelectItem>
+                  <SelectItem value="postponed">Postponed</SelectItem>
+                </SelectContent>
+              </Select>
               <div className="flex gap-2">
                 <Button onClick={addProject} disabled={!newProject.name.trim()}>
                   Add Project
@@ -390,6 +405,15 @@ export const ProjectsView = () => {
                   ))}
                 </SelectContent>
               </Select>
+              <Select value={editingProject.status} onValueChange={(value: 'active' | 'postponed') => setEditingProject({...editingProject, status: value})}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select status..." />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="active">Active</SelectItem>
+                  <SelectItem value="postponed">Postponed</SelectItem>
+                </SelectContent>
+              </Select>
               <div className="flex gap-2">
                 <Button onClick={updateProject} disabled={!editingProject.name.trim()}>
                   Update Project
@@ -421,9 +445,14 @@ export const ProjectsView = () => {
                 <div className="flex justify-between items-start">
                   <div className="flex-1">
                     <CardTitle className="text-lg">{project.name}</CardTitle>
-                    <Badge className={getLifeAreaColor(project.lifeArea)} variant="outline">
-                      {project.lifeArea}
-                    </Badge>
+                    <div className="flex gap-2 mt-2">
+                      <Badge className={getLifeAreaColor(project.lifeArea)} variant="outline">
+                        {project.lifeArea}
+                      </Badge>
+                      <Badge className={getStatusColor(project.status)} variant="outline">
+                        {project.status}
+                      </Badge>
+                    </div>
                   </div>
                   <div className="flex gap-2">
                     <Button size="sm" variant="outline" onClick={() => editProject(project)}>

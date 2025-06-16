@@ -1,14 +1,15 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
+import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Progress } from '@/components/ui/progress';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Calendar, CheckCircle2, Clock, ChevronDown, ChevronRight, Target, FileText, Timer, Settings2 } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Calendar, CheckCircle2, Clock, ChevronDown, ChevronRight, Target, FileText, Timer, Settings2, Plus, Edit, Trash2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 interface WeeklySession {
@@ -16,14 +17,14 @@ interface WeeklySession {
   date: string;
   completed: boolean;
   completedItems: string[];
-  notes: {
-    notesReview: string;
-    dissatisfactionsUpdate: string;
-    prioritiesAdjustment: string;
-    timeReflection: string;
-    tasksPlanning: string;
-    pomodoroPlanning: string;
-  };
+  notes: Record<string, string>;
+}
+
+interface AgendaItem {
+  id: string;
+  title: string;
+  icon: any;
+  description: string;
 }
 
 export const WeeklyStrategyHub = () => {
@@ -34,21 +35,17 @@ export const WeeklyStrategyHub = () => {
     date: '',
     completed: false,
     completedItems: [],
-    notes: {
-      notesReview: '',
-      dissatisfactionsUpdate: '',
-      prioritiesAdjustment: '',
-      timeReflection: '',
-      tasksPlanning: '',
-      pomodoroPlanning: ''
-    }
+    notes: {}
   });
   const [sessionHistory, setSessionHistory] = useState<WeeklySession[]>([]);
   const [openSections, setOpenSections] = useState<string[]>(['notesReview']);
+  const [agendaItems, setAgendaItems] = useState<AgendaItem[]>([]);
+  const [editAgendaDialog, setEditAgendaDialog] = useState(false);
+  const [newAgendaItem, setNewAgendaItem] = useState({ title: '', description: '' });
 
   const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
-  const agendaItems = [
+  const defaultAgendaItems = [
     {
       id: 'notesReview',
       title: 'Review and clean up notes and drafts',
@@ -92,6 +89,13 @@ export const WeeklyStrategyHub = () => {
     initializeCurrentSession();
   }, []);
 
+  // Save progress whenever session changes
+  useEffect(() => {
+    if (currentSession.id) {
+      localStorage.setItem('currentWeeklySession', JSON.stringify(currentSession));
+    }
+  }, [currentSession]);
+
   const loadData = () => {
     const savedStrategyDay = localStorage.getItem('weeklyStrategyDay');
     if (savedStrategyDay) {
@@ -101,6 +105,13 @@ export const WeeklyStrategyHub = () => {
     const savedHistory = localStorage.getItem('weeklyStrategyHistory');
     if (savedHistory) {
       setSessionHistory(JSON.parse(savedHistory));
+    }
+
+    const savedAgenda = localStorage.getItem('weeklyAgendaItems');
+    if (savedAgenda) {
+      setAgendaItems(JSON.parse(savedAgenda));
+    } else {
+      setAgendaItems(defaultAgendaItems);
     }
 
     const savedCurrentSession = localStorage.getItem('currentWeeklySession');
@@ -123,14 +134,7 @@ export const WeeklyStrategyHub = () => {
       date: today.toISOString(),
       completed: false,
       completedItems: [],
-      notes: {
-        notesReview: '',
-        dissatisfactionsUpdate: '',
-        prioritiesAdjustment: '',
-        timeReflection: '',
-        tasksPlanning: '',
-        pomodoroPlanning: ''
-      }
+      notes: {}
     };
 
     setCurrentSession(newSession);
@@ -169,7 +173,7 @@ export const WeeklyStrategyHub = () => {
     );
   };
 
-  const updateNote = (noteType: keyof typeof currentSession.notes, value: string) => {
+  const updateNote = (noteType: string, value: string) => {
     const updatedSession = {
       ...currentSession,
       notes: {
@@ -231,6 +235,58 @@ export const WeeklyStrategyHub = () => {
     return currentSession.completedItems.length === agendaItems.length;
   };
 
+  const saveAgendaItems = (items: AgendaItem[]) => {
+    setAgendaItems(items);
+    localStorage.setItem('weeklyAgendaItems', JSON.stringify(items));
+  };
+
+  const addAgendaItem = () => {
+    if (!newAgendaItem.title.trim()) {
+      toast({
+        title: "Error",
+        description: "Please enter an agenda item title",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    const newItem: AgendaItem = {
+      id: `custom_${Date.now()}`,
+      title: newAgendaItem.title.trim(),
+      description: newAgendaItem.description.trim(),
+      icon: Target
+    };
+
+    const updatedItems = [...agendaItems, newItem];
+    saveAgendaItems(updatedItems);
+
+    setNewAgendaItem({ title: '', description: '' });
+    toast({
+      title: "Agenda Item Added",
+      description: "New item has been added to your weekly agenda"
+    });
+  };
+
+  const deleteAgendaItem = (itemId: string) => {
+    const updatedItems = agendaItems.filter(item => item.id !== itemId);
+    saveAgendaItems(updatedItems);
+
+    // Remove from current session if it exists
+    const updatedSession = {
+      ...currentSession,
+      completedItems: currentSession.completedItems.filter(id => id !== itemId),
+      notes: Object.fromEntries(
+        Object.entries(currentSession.notes).filter(([key]) => key !== itemId)
+      )
+    };
+    setCurrentSession(updatedSession);
+
+    toast({
+      title: "Agenda Item Deleted",
+      description: "Item has been removed from your weekly agenda"
+    });
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -246,7 +302,7 @@ export const WeeklyStrategyHub = () => {
         )}
       </div>
 
-      {/* Strategy Day Setting */}
+      {/* Strategy Day Configuration */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -276,6 +332,65 @@ export const WeeklyStrategyHub = () => {
             )}
           </div>
         </CardContent>
+      </Card>
+
+      {/* Manage Agenda */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center justify-between">
+            <span>Manage Weekly Agenda</span>
+            <Dialog open={editAgendaDialog} onOpenChange={setEditAgendaDialog}>
+              <DialogTrigger asChild>
+                <Button variant="outline" size="sm">
+                  <Edit className="h-4 w-4 mr-2" />
+                  Edit Agenda
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="max-w-2xl">
+                <DialogHeader>
+                  <DialogTitle>Edit Weekly Strategy Agenda</DialogTitle>
+                </DialogHeader>
+                <div className="space-y-4 max-h-96 overflow-y-auto">
+                  {agendaItems.map((item) => (
+                    <div key={item.id} className="flex items-start gap-3 p-3 border rounded-lg">
+                      <div className="flex-1">
+                        <div className="font-medium">{item.title}</div>
+                        <div className="text-sm text-slate-500">{item.description}</div>
+                      </div>
+                      <Button 
+                        size="sm" 
+                        variant="outline"
+                        onClick={() => deleteAgendaItem(item.id)}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  ))}
+                  
+                  <div className="border-t pt-4">
+                    <h4 className="font-medium mb-3">Add New Agenda Item</h4>
+                    <div className="space-y-3">
+                      <Input
+                        placeholder="Agenda item title..."
+                        value={newAgendaItem.title}
+                        onChange={(e) => setNewAgendaItem({...newAgendaItem, title: e.target.value})}
+                      />
+                      <Textarea
+                        placeholder="Description..."
+                        value={newAgendaItem.description}
+                        onChange={(e) => setNewAgendaItem({...newAgendaItem, description: e.target.value})}
+                      />
+                      <Button onClick={addAgendaItem} disabled={!newAgendaItem.title.trim()}>
+                        <Plus className="h-4 w-4 mr-2" />
+                        Add Item
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              </DialogContent>
+            </Dialog>
+          </CardTitle>
+        </CardHeader>
       </Card>
 
       {/* Current Session Progress */}
@@ -342,8 +457,8 @@ export const WeeklyStrategyHub = () => {
                     <CollapsibleContent className="px-0 pb-4">
                       <Textarea
                         placeholder={`Notes for: ${item.title}`}
-                        value={currentSession.notes[item.id as keyof typeof currentSession.notes]}
-                        onChange={(e) => updateNote(item.id as keyof typeof currentSession.notes, e.target.value)}
+                        value={currentSession.notes[item.id] || ''}
+                        onChange={(e) => updateNote(item.id, e.target.value)}
                         className="min-h-[120px] mt-3"
                       />
                     </CollapsibleContent>

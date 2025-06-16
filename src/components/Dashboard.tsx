@@ -83,9 +83,9 @@ export const Dashboard = () => {
       .reduce((sum, log) => sum + (log.duration / 60), 0);
 
     return {
-      totalHours: totalHours.toFixed(1),
-      investedHours: investedHours.toFixed(1),
-      spentHours: spentHours.toFixed(1),
+      totalHours: Math.round(totalHours).toString(),
+      investedHours: Math.round(investedHours).toString(),
+      spentHours: Math.round(spentHours).toString(),
       investedPercentage: totalHours > 0 ? Math.round((investedHours / totalHours) * 100) : 0,
       spentPercentage: totalHours > 0 ? Math.round((spentHours / totalHours) * 100) : 0
     };
@@ -96,17 +96,18 @@ export const Dashboard = () => {
   // Get active projects with progress
   const getActiveProjects = () => {
     return projects
-      .filter(project => project.status === 'active')
+      .filter(project => project.status === 'active' || !project.status) // Include projects without status for backward compatibility
       .slice(0, 3)
       .map(project => ({
         name: project.name,
-        hours: project.investedHours || 0,
+        hours: Math.round(project.investedHours || 0),
         category: project.lifeArea || 'General',
         progress: project.progress || 0
       }));
   };
 
   const activeProjects = getActiveProjects();
+  const activeProjectsCount = projects.filter(project => project.status === 'active' || !project.status).length;
 
   // Check if strategy session is due
   const isStrategySessionDue = () => {
@@ -162,7 +163,7 @@ export const Dashboard = () => {
             <FolderOpen className="h-4 w-4 text-slate-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{projects.filter(p => p.status === 'active').length}</div>
+            <div className="text-2xl font-bold">{activeProjectsCount}</div>
             <p className="text-xs text-slate-500">Currently working on</p>
           </CardContent>
         </Card>
@@ -216,7 +217,7 @@ export const Dashboard = () => {
                       <span className="font-medium">{project.name}</span>
                       <Badge variant="secondary">{project.category}</Badge>
                     </div>
-                    <span className="text-sm text-slate-500">{project.hours.toFixed(1)}h</span>
+                    <span className="text-sm text-slate-500">{project.hours}h</span>
                   </div>
                   <Progress value={project.progress} className="h-2" />
                 </div>
