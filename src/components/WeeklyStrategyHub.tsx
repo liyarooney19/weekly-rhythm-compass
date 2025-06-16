@@ -43,7 +43,6 @@ export const WeeklyStrategyHub = () => {
   const [agendaItems, setAgendaItems] = useState<AgendaItem[]>([]);
   const [editAgendaDialog, setEditAgendaDialog] = useState(false);
   const [newAgendaItem, setNewAgendaItem] = useState({ title: '', description: '' });
-  const [isLoading, setIsLoading] = useState(true);
 
   const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
@@ -87,58 +86,50 @@ export const WeeklyStrategyHub = () => {
   ];
 
   useEffect(() => {
-    const initializeComponent = async () => {
-      try {
-        setIsLoading(true);
-        await loadData();
-        initializeCurrentSession();
-      } catch (error) {
-        console.error('Error initializing WeeklyStrategyHub:', error);
-        // Set default values on error
-        setAgendaItems(defaultAgendaItems);
-        initializeCurrentSession();
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    initializeComponent();
+    loadData();
+    initializeCurrentSession();
   }, []);
 
   // Save progress whenever session changes
   useEffect(() => {
-    if (currentSession.id && !isLoading) {
-      try {
-        localStorage.setItem('currentWeeklySession', JSON.stringify(currentSession));
-      } catch (error) {
-        console.error('Error saving current session:', error);
-      }
+    if (currentSession.id) {
+      localStorage.setItem('currentWeeklySession', JSON.stringify(currentSession));
     }
-  }, [currentSession, isLoading]);
+  }, [currentSession]);
 
-  const loadData = async () => {
-    try {
-      const savedStrategyDay = localStorage.getItem('weeklyStrategyDay');
-      if (savedStrategyDay) {
-        setStrategyDay(savedStrategyDay);
-      }
+  const loadData = () => {
+    const savedStrategyDay = localStorage.getItem('weeklyStrategyDay');
+    if (savedStrategyDay) {
+      setStrategyDay(savedStrategyDay);
+    }
 
-      const savedHistory = localStorage.getItem('weeklyStrategyHistory');
-      if (savedHistory) {
+    const savedHistory = localStorage.getItem('weeklyStrategyHistory');
+    if (savedHistory) {
+      try {
         const parsedHistory = JSON.parse(savedHistory);
         setSessionHistory(Array.isArray(parsedHistory) ? parsedHistory : []);
+      } catch (error) {
+        console.error('Error parsing session history:', error);
+        setSessionHistory([]);
       }
+    }
 
-      const savedAgenda = localStorage.getItem('weeklyAgendaItems');
-      if (savedAgenda) {
+    const savedAgenda = localStorage.getItem('weeklyAgendaItems');
+    if (savedAgenda) {
+      try {
         const parsedAgenda = JSON.parse(savedAgenda);
         setAgendaItems(Array.isArray(parsedAgenda) ? parsedAgenda : defaultAgendaItems);
-      } else {
+      } catch (error) {
+        console.error('Error parsing agenda items:', error);
         setAgendaItems(defaultAgendaItems);
       }
+    } else {
+      setAgendaItems(defaultAgendaItems);
+    }
 
-      const savedCurrentSession = localStorage.getItem('currentWeeklySession');
-      if (savedCurrentSession) {
+    const savedCurrentSession = localStorage.getItem('currentWeeklySession');
+    if (savedCurrentSession) {
+      try {
         const parsed = JSON.parse(savedCurrentSession);
         const currentWeek = getWeekId(new Date());
         if (parsed.id === currentWeek && !parsed.completed) {
@@ -149,31 +140,25 @@ export const WeeklyStrategyHub = () => {
           });
           return;
         }
+      } catch (error) {
+        console.error('Error parsing current session:', error);
       }
-    } catch (error) {
-      console.error('Error loading data:', error);
-      setAgendaItems(defaultAgendaItems);
     }
   };
 
   const initializeCurrentSession = () => {
-    try {
-      const today = new Date();
-      const currentWeek = getWeekId(today);
-      
-      const newSession = {
-        id: currentWeek,
-        date: today.toISOString(),
-        completed: false,
-        completedItems: [],
-        notes: {}
-      };
+    const today = new Date();
+    const currentWeek = getWeekId(today);
+    
+    const newSession = {
+      id: currentWeek,
+      date: today.toISOString(),
+      completed: false,
+      completedItems: [],
+      notes: {}
+    };
 
-      setCurrentSession(newSession);
-      localStorage.setItem('currentWeeklySession', JSON.stringify(newSession));
-    } catch (error) {
-      console.error('Error initializing current session:', error);
-    }
+    setCurrentSession(newSession);
   };
 
   const getWeekId = (date: Date) => {
@@ -320,46 +305,6 @@ export const WeeklyStrategyHub = () => {
       description: "Item has been removed from your weekly agenda"
     });
   };
-
-  if (isLoading) {
-    return (
-      <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold text-slate-800 mb-2">Weekly Strategy Hub</h1>
-            <p className="text-slate-600">Loading your weekly strategy session...</p>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  if (!agendaItems || agendaItems.length === 0) {
-    return (
-      <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold text-slate-800 mb-2">Weekly Strategy Hub</h1>
-            <p className="text-slate-600">Setting up your weekly strategy session...</p>
-          </div>
-        </div>
-        <Card>
-          <CardContent className="p-6">
-            <p className="text-slate-600">Initializing your weekly strategy agenda...</p>
-            <Button 
-              onClick={() => {
-                setAgendaItems(defaultAgendaItems);
-                initializeCurrentSession();
-              }}
-              className="mt-4"
-            >
-              Initialize Default Agenda
-            </Button>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
 
   return (
     <div className="space-y-6">

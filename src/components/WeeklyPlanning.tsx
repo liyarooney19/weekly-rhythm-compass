@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -39,8 +40,10 @@ export const WeeklyPlanning = () => {
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [taskEstimatedHours, setTaskEstimatedHours] = useState('');
 
-  const formatHours = (hours: number) => {
-    return Math.round(hours * 10) / 10; // Round to 1 decimal place
+  const formatHours = (hours: number | string) => {
+    const numHours = typeof hours === 'string' ? parseFloat(hours) : hours;
+    if (isNaN(numHours)) return 0;
+    return Math.round(numHours * 10) / 10; // Round to 1 decimal place
   };
 
   useEffect(() => {
@@ -50,11 +53,32 @@ export const WeeklyPlanning = () => {
   const loadData = () => {
     // Load projects
     const savedProjects = localStorage.getItem('projects');
-    setProjects(savedProjects ? JSON.parse(savedProjects) : []);
+    if (savedProjects) {
+      try {
+        const parsed = JSON.parse(savedProjects);
+        setProjects(Array.isArray(parsed) ? parsed : []);
+      } catch (error) {
+        console.error('Error parsing projects:', error);
+        setProjects([]);
+      }
+    }
 
     // Load weekly tasks
     const savedWeeklyTasks = localStorage.getItem('weeklyTasks');
-    setWeeklyTasks(savedWeeklyTasks ? JSON.parse(savedWeeklyTasks) : []);
+    if (savedWeeklyTasks) {
+      try {
+        const parsed = JSON.parse(savedWeeklyTasks);
+        const validatedTasks = Array.isArray(parsed) ? parsed.map(task => ({
+          ...task,
+          estimatedHours: formatHours(task.estimatedHours || 0),
+          actualHours: formatHours(task.actualHours || 0)
+        })) : [];
+        setWeeklyTasks(validatedTasks);
+      } catch (error) {
+        console.error('Error parsing weekly tasks:', error);
+        setWeeklyTasks([]);
+      }
+    }
   };
 
   const saveWeeklyTasks = (tasks: WeeklyTask[]) => {
@@ -85,7 +109,7 @@ export const WeeklyPlanning = () => {
       return;
     }
 
-    const estimatedHours = parseFloat(taskEstimatedHours) || 0;
+    const estimatedHours = formatHours(taskEstimatedHours || 0);
 
     const newTask = {
       id: Date.now().toString(),
@@ -93,7 +117,7 @@ export const WeeklyPlanning = () => {
       taskId: selectedTask.id,
       projectName: selectedProject.name,
       taskName: selectedTask.name,
-      estimatedHours: formatHours(estimatedHours),
+      estimatedHours: estimatedHours,
       completed: false,
       actualHours: 0
     };
@@ -114,10 +138,10 @@ export const WeeklyPlanning = () => {
   };
 
   const updateTaskHours = (taskId: string, hours: string) => {
-    const numericHours = parseFloat(hours) || 0;
+    const numericHours = formatHours(hours);
     const updatedTasks = weeklyTasks.map(task =>
       task.id === taskId
-        ? { ...task, actualHours: formatHours(numericHours) }
+        ? { ...task, actualHours: numericHours }
         : task
     );
     setWeeklyTasks(updatedTasks);
@@ -125,10 +149,10 @@ export const WeeklyPlanning = () => {
   };
 
   const updateEstimatedHours = (taskId: string, hours: string) => {
-    const numericHours = parseFloat(hours) || 0;
+    const numericHours = formatHours(hours);
     const updatedTasks = weeklyTasks.map(task =>
       task.id === taskId
-        ? { ...task, estimatedHours: formatHours(numericHours) }
+        ? { ...task, estimatedHours: numericHours }
         : task
     );
     setWeeklyTasks(updatedTasks);
@@ -136,11 +160,11 @@ export const WeeklyPlanning = () => {
   };
 
   const getTotalPlannedHours = () => {
-    return formatHours(weeklyTasks.reduce((sum, task) => sum + task.estimatedHours, 0));
+    return formatHours(weeklyTasks.reduce((sum, task) => sum + (task.estimatedHours || 0), 0));
   };
 
   const getTotalActualHours = () => {
-    return formatHours(weeklyTasks.reduce((sum, task) => sum + task.actualHours, 0));
+    return formatHours(weeklyTasks.reduce((sum, task) => sum + (task.actualHours || 0), 0));
   };
 
   const getCompletionPercentage = () => {
