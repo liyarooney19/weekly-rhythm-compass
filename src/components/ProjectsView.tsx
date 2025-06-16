@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -48,6 +49,7 @@ export const ProjectsView = () => {
 
   const lifeAreas = [
     'Work / Career',
+    'Personal Growth',
     'Creative Projects', 
     'Health & Routines',
     'Relationships / Family',
@@ -265,6 +267,7 @@ export const ProjectsView = () => {
   const getLifeAreaColor = (lifeArea: string) => {
     const colors = {
       'Work / Career': 'bg-purple-100 text-purple-800',
+      'Personal Growth': 'bg-blue-100 text-blue-800',
       'Creative Projects': 'bg-orange-100 text-orange-800',
       'Health & Routines': 'bg-red-100 text-red-800',
       'Relationships / Family': 'bg-pink-100 text-pink-800',
