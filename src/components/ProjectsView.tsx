@@ -37,7 +37,7 @@ export const ProjectsView = () => {
   const [newProject, setNewProject] = useState({
     name: '',
     description: '',
-    lifeArea: 'Personal Growth'
+    lifeArea: 'Work / Career'
   });
   const [newTask, setNewTask] = useState({
     name: '',
@@ -46,7 +46,13 @@ export const ProjectsView = () => {
   const [newProjectDialog, setNewProjectDialog] = useState(false);
   const { toast } = useToast();
 
-  const lifeAreas = ['Personal Growth', 'Career', 'Finance', 'Health', 'Relationships', 'Leisure'];
+  const lifeAreas = [
+    'Work / Career',
+    'Creative Projects', 
+    'Health & Routines',
+    'Relationships / Family',
+    'Leisure/Hobby'
+  ];
 
   useEffect(() => {
     loadProjects();
@@ -133,7 +139,7 @@ export const ProjectsView = () => {
     setNewProject({
       name: '',
       description: '',
-      lifeArea: 'Personal Growth'
+      lifeArea: 'Work / Career'
     });
     setNewProjectDialog(false);
 
@@ -258,12 +264,11 @@ export const ProjectsView = () => {
 
   const getLifeAreaColor = (lifeArea: string) => {
     const colors = {
-      'Personal Growth': 'bg-blue-100 text-blue-800',
-      'Career': 'bg-purple-100 text-purple-800',
-      'Finance': 'bg-green-100 text-green-800',
-      'Health': 'bg-red-100 text-red-800',
-      'Relationships': 'bg-pink-100 text-pink-800',
-      'Leisure': 'bg-orange-100 text-orange-800'
+      'Work / Career': 'bg-purple-100 text-purple-800',
+      'Creative Projects': 'bg-orange-100 text-orange-800',
+      'Health & Routines': 'bg-red-100 text-red-800',
+      'Relationships / Family': 'bg-pink-100 text-pink-800',
+      'Leisure/Hobby': 'bg-green-100 text-green-800'
     };
     return colors[lifeArea as keyof typeof colors] || 'bg-slate-100 text-slate-800';
   };
