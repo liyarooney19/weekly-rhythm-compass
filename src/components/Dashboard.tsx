@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
-import { Timer, Target, BookOpen, FileText, Gamepad2, Calendar, Trash2, Settings, FolderOpen } from 'lucide-react';
+import { Timer, Target, BookOpen, FileText, Gamepad2, Calendar, Trash2, Settings, FolderOpen, Clock } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 export const Dashboard = () => {
@@ -271,33 +271,48 @@ export const Dashboard = () => {
         </Card>
       </div>
 
-      {/* Enhanced Active Projects Display */}
+      {/* Beautiful Active Projects Display */}
       {activeProjects.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Active Projects ({activeProjects.length})</CardTitle>
+        <Card className="overflow-hidden">
+          <CardHeader className="bg-gradient-to-r from-blue-50 to-indigo-50 border-b border-blue-100">
+            <CardTitle className="flex items-center gap-2 text-blue-900">
+              <FolderOpen className="h-5 w-5" />
+              Active Projects ({activeProjects.length})
+            </CardTitle>
           </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <CardContent className="p-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {activeProjects.map((project, index) => (
-                <div key={index} className="bg-gradient-to-br from-white to-slate-50 border border-slate-200 rounded-lg p-4 hover:shadow-md transition-shadow">
-                  <div className="flex items-start justify-between mb-3">
-                    <div className="flex-1">
-                      <h3 className="font-semibold text-slate-800 mb-1 line-clamp-2">{project.name}</h3>
-                      <Badge variant="secondary" className="text-xs">{project.category}</Badge>
+                <div key={index} className="group relative">
+                  <div className="absolute inset-0 bg-gradient-to-br from-blue-500/10 to-purple-500/10 rounded-xl blur-sm group-hover:blur-none transition-all duration-300" />
+                  <div className="relative bg-white/80 backdrop-blur-sm border border-white/50 rounded-xl p-6 hover:shadow-lg hover:scale-105 transition-all duration-300">
+                    <div className="flex items-start justify-between mb-4">
+                      <div className="flex-1">
+                        <h3 className="font-bold text-slate-800 text-lg mb-2 line-clamp-2 leading-tight">
+                          {project.name}
+                        </h3>
+                        <Badge variant="secondary" className="text-xs font-medium bg-blue-100 text-blue-700 border-blue-200">
+                          {project.category}
+                        </Badge>
+                      </div>
                     </div>
-                  </div>
-                  
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="text-slate-600">Progress</span>
-                      <span className="font-medium text-slate-800">{project.progress}%</span>
-                    </div>
-                    <Progress value={project.progress} className="h-2" />
                     
-                    <div className="flex items-center justify-between text-sm pt-2">
-                      <span className="text-slate-600">Time invested</span>
-                      <span className="font-medium text-green-600">{project.hours}h</span>
+                    <div className="space-y-4">
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm font-medium text-slate-600">Progress</span>
+                          <span className="text-lg font-bold text-slate-800">{project.progress}%</span>
+                        </div>
+                        <Progress value={project.progress} className="h-3 bg-slate-100" />
+                      </div>
+                      
+                      <div className="flex items-center justify-between pt-2 border-t border-slate-100">
+                        <div className="flex items-center gap-2 text-green-600">
+                          <Clock className="h-4 w-4" />
+                          <span className="text-sm font-medium">Time invested</span>
+                        </div>
+                        <span className="text-xl font-bold text-green-600">{project.hours}h</span>
+                      </div>
                     </div>
                   </div>
                 </div>

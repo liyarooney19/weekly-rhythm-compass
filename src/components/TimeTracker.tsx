@@ -90,6 +90,15 @@ export const TimeTracker = () => {
       return;
     }
 
+    if (!selectedProject) {
+      toast({
+        title: "Error",
+        description: "Please select a project before starting the timer",
+        variant: "destructive"
+      });
+      return;
+    }
+
     setIsRunning(true);
     setIsPaused(false);
     toast({
@@ -260,16 +269,9 @@ export const TimeTracker = () => {
 
             {/* Task Input */}
             <div className="space-y-4">
-              <Input
-                placeholder="What are you working on?"
-                value={currentTask}
-                onChange={(e) => setCurrentTask(e.target.value)}
-                disabled={isRunning}
-              />
-
               <Select value={selectedProject} onValueChange={setSelectedProject} disabled={isRunning}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select project (optional)" />
+                <SelectTrigger className={!selectedProject && !isRunning ? "border-red-300 focus:border-red-500" : ""}>
+                  <SelectValue placeholder="Select project (required)" />
                 </SelectTrigger>
                 <SelectContent>
                   {projects.map(project => (
@@ -279,6 +281,14 @@ export const TimeTracker = () => {
                   ))}
                 </SelectContent>
               </Select>
+
+              <Input
+                placeholder="What specific task are you working on? (required)"
+                value={currentTask}
+                onChange={(e) => setCurrentTask(e.target.value)}
+                disabled={isRunning}
+                className={!currentTask.trim() && !isRunning ? "border-red-300 focus:border-red-500" : ""}
+              />
 
               <Select value={timeType} onValueChange={(value: 'invested' | 'spent') => setTimeType(value)} disabled={isRunning}>
                 <SelectTrigger>
