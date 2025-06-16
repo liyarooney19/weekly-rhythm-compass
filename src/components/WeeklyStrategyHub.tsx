@@ -4,7 +4,6 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Calendar, Target, CheckCircle, Plus, Edit, Save, X } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
@@ -43,16 +42,23 @@ export const WeeklyStrategyHub = () => {
 
   const loadWeeklyData = () => {
     try {
-      // Load goals
+      // Load goals with validation
       const savedGoals = localStorage.getItem('weeklyGoals');
       if (savedGoals) {
         const parsed = JSON.parse(savedGoals);
         if (Array.isArray(parsed)) {
-          setGoals(parsed);
+          const validGoals = parsed.filter(goal => 
+            goal && 
+            typeof goal === 'object' && 
+            goal.text && 
+            goal.text.trim() !== '' &&
+            typeof goal.id === 'string'
+          );
+          setGoals(validGoals);
         }
       }
 
-      // Load reflection
+      // Load reflection with validation
       const savedReflection = localStorage.getItem('weeklyReflection');
       if (savedReflection) {
         const parsed = JSON.parse(savedReflection);
@@ -67,14 +73,23 @@ export const WeeklyStrategyHub = () => {
       }
     } catch (error) {
       console.error('Error loading weekly data:', error);
+      // Reset to empty state on error
+      setGoals([]);
+      setReflection({
+        wins: '',
+        challenges: '',
+        learnings: '',
+        nextWeekFocus: ''
+      });
     } finally {
       setIsLoading(false);
     }
   };
 
   const saveGoals = (updatedGoals: WeeklyGoal[]) => {
-    setGoals(updatedGoals);
-    localStorage.setItem('weeklyGoals', JSON.stringify(updatedGoals));
+    const validGoals = updatedGoals.filter(goal => goal && goal.text && goal.text.trim());
+    setGoals(validGoals);
+    localStorage.setItem('weeklyGoals', JSON.stringify(validGoals));
   };
 
   const saveReflection = (updatedReflection: WeeklyReflection) => {
