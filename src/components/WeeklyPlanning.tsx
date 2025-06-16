@@ -3,6 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Progress } from '@/components/ui/progress';
 import { Calendar, CheckCircle, Clock, Plus, Trash2, Target } from 'lucide-react';
@@ -29,6 +30,7 @@ interface WeeklyTask {
   estimatedHours: number;
   completed: boolean;
   actualHours: number;
+  timeType: 'invested' | 'spent';
 }
 
 export const WeeklyPlanning = () => {
@@ -57,7 +59,8 @@ export const WeeklyPlanning = () => {
       taskName: task.taskName || 'Unknown Task',
       estimatedHours: formatHours(task.estimatedHours),
       completed: Boolean(task.completed),
-      actualHours: formatHours(task.actualHours)
+      actualHours: formatHours(task.actualHours),
+      timeType: task.timeType || 'invested'
     };
   };
 
@@ -153,7 +156,8 @@ export const WeeklyPlanning = () => {
       taskName: selectedTask.name,
       estimatedHours: estimatedHours,
       completed: false,
-      actualHours: 0
+      actualHours: 0,
+      timeType: 'invested'
     };
 
     const updatedTasks = [...weeklyTasks, newTask];
@@ -190,7 +194,8 @@ export const WeeklyPlanning = () => {
       taskName: standaloneTaskName.trim(),
       estimatedHours: estimatedHours,
       completed: false,
-      actualHours: 0
+      actualHours: 0,
+      timeType: 'invested'
     };
 
     const updatedTasks = [...weeklyTasks, newTask];
@@ -226,12 +231,33 @@ export const WeeklyPlanning = () => {
     saveWeeklyTasks(updatedTasks);
   };
 
+  const updateTimeType = (taskId: string, timeType: 'invested' | 'spent') => {
+    const updatedTasks = weeklyTasks.map(task =>
+      task.id === taskId
+        ? { ...task, timeType }
+        : task
+    );
+    saveWeeklyTasks(updatedTasks);
+  };
+
   const getTotalPlannedHours = () => {
     return formatHours(weeklyTasks.reduce((sum, task) => sum + (task.estimatedHours || 0), 0));
   };
 
   const getTotalActualHours = () => {
     return formatHours(weeklyTasks.reduce((sum, task) => sum + (task.actualHours || 0), 0));
+  };
+
+  const getInvestedHours = () => {
+    return formatHours(weeklyTasks
+      .filter(task => task.timeType === 'invested')
+      .reduce((sum, task) => sum + (task.actualHours || 0), 0));
+  };
+
+  const getSpentHours = () => {
+    return formatHours(weeklyTasks
+      .filter(task => task.timeType === 'spent')
+      .reduce((sum, task) => sum + (task.actualHours || 0), 0));
   };
 
   const getCompletionPercentage = () => {
@@ -252,7 +278,7 @@ export const WeeklyPlanning = () => {
       </div>
 
       {/* Weekly Summary */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Total Planned</CardTitle>
@@ -266,12 +292,23 @@ export const WeeklyPlanning = () => {
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Actual Hours</CardTitle>
-            <Clock className="h-4 w-4 text-slate-500" />
+            <CardTitle className="text-sm font-medium">Time Invested</CardTitle>
+            <Clock className="h-4 w-4 text-green-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{getTotalActualHours()}h</div>
-            <p className="text-xs text-slate-500">Time logged</p>
+            <div className="text-2xl font-bold text-green-600">{getInvestedHours()}h</div>
+            <p className="text-xs text-slate-500">Productive time</p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Time Spent</CardTitle>
+            <Clock className="h-4 w-4 text-orange-500" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-orange-600">{getSpentHours()}h</div>
+            <p className="text-xs text-slate-500">Less productive time</p>
           </CardContent>
         </Card>
 
@@ -453,6 +490,27 @@ export const WeeklyPlanning = () => {
                         className="w-20 text-center"
                       />
                     </div>
+                    <div className="text-sm">
+                      <label className="block text-xs text-slate-500 mb-1">Time Type</label>
+                      <RadioGroup 
+                        value={task.timeType} 
+                        onValueChange={(value) => updateTimeType(task.id, value as 'invested' | 'spent')}
+                        className="flex gap-2"
+                      >
+                        <div className="flex items-center space-x-1">
+                          <RadioGroupItem value="invested" id={`invested-${task.id}`} />
+                          <label htmlFor={`invested-${task.id}`} className="text-xs text-green-600 cursor-pointer">
+                            Invested
+                          </label>
+                        </div>
+                        <div className="flex items-center space-x-1">
+                          <RadioGroupItem value="spent" id={`spent-${task.id}`} />
+                          <label htmlFor={`spent-${task.id}`} className="text-xs text-orange-600 cursor-pointer">
+                            Spent
+                          </label>
+                        </div>
+                      </RadioGroup>
+                    </div>
                   </div>
                   <Button
                     variant="outline"
@@ -484,14 +542,22 @@ export const WeeklyPlanning = () => {
                 <Progress value={getCompletionPercentage()} />
               </div>
               
-              <div className="grid grid-cols-2 gap-4 text-sm">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
                 <div>
                   <span className="text-slate-500">Planned Hours:</span>
                   <span className="font-medium ml-2">{getTotalPlannedHours()}h</span>
                 </div>
                 <div>
-                  <span className="text-slate-500">Actual Hours:</span>
+                  <span className="text-slate-500">Total Actual:</span>
                   <span className="font-medium ml-2">{getTotalActualHours()}h</span>
+                </div>
+                <div>
+                  <span className="text-green-600">Time Invested:</span>
+                  <span className="font-medium ml-2 text-green-600">{getInvestedHours()}h</span>
+                </div>
+                <div>
+                  <span className="text-orange-600">Time Spent:</span>
+                  <span className="font-medium ml-2 text-orange-600">{getSpentHours()}h</span>
                 </div>
               </div>
             </div>
