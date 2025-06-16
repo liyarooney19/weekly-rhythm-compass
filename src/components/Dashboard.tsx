@@ -37,14 +37,14 @@ interface TimeLog {
 
 interface StrategySession {
   date: string;
-  projects: any[];
-  reflection: string;
+  completed: boolean;
+  completedItems: string[];
+  agendaItems: any[];
 }
 
 export const Dashboard = () => {
   const { toast } = useToast();
   const [projects, setProjects] = useState<Project[]>([]);
-  const [strategySession, setStrategySession] = useState<StrategySession | null>(null);
 
   useEffect(() => {
     loadData();
@@ -55,49 +55,114 @@ export const Dashboard = () => {
     if (savedProjects) {
       setProjects(JSON.parse(savedProjects));
     }
-
-    const savedStrategy = localStorage.getItem('strategySession');
-    if (savedStrategy) {
-      setStrategySession(JSON.parse(savedStrategy));
-    }
-  };
-
-  const getWeekNumber = (date: Date) => {
-    const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
-    const dayNum = d.getUTCDay() || 7;
-    d.setUTCDate(d.getUTCDate() + 4 - dayNum);
-    const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
-    return Math.ceil((((d.getTime() - yearStart.getTime()) / 86400000) + 1) / 7);
   };
 
   const getNextStrategyDate = () => {
-    if (!strategySession || !strategySession.date) {
-      return 'No strategy session planned.';
-    }
-
-    const sessionDate = new Date(strategySession.date);
-    const today = new Date();
-    
-    if (sessionDate >= today) {
-      return sessionDate.toLocaleDateString();
-    } else {
-      return 'No upcoming strategy session.';
+    try {
+      // Get strategy day preference (default to Sunday)
+      const strategyDay = localStorage.getItem('strategyDay') || 'Sunday';
+      
+      // Get session history
+      const sessionHistoryString = localStorage.getItem('strategySessionHistory');
+      const sessionHistory: StrategySession[] = sessionHistoryString ? JSON.parse(sessionHistoryString) : [];
+      
+      // Check if there's a current active session
+      const currentSessionString = localStorage.getItem('currentStrategySession');
+      const currentSession = currentSessionString ? JSON.parse(currentSessionString) : null;
+      
+      const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+      const targetDayIndex = days.indexOf(strategyDay);
+      const today = new Date();
+      
+      // If there's an active session today, show when it's due
+      if (currentSession && !currentSession.completed) {
+        const sessionDate = new Date(currentSession.date);
+        const isToday = sessionDate.toDateString() === today.toDateString();
+        if (isToday) {
+          return `Due Today (${strategyDay})`;
+        }
+      }
+      
+      // Find the most recent completed session
+      const completedSessions = sessionHistory.filter(session => session.completed);
+      
+      if (completedSessions.length > 0) {
+        // Sort by date descending to get the most recent
+        completedSessions.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+        const lastSession = completedSessions[0];
+        const lastSessionDate = new Date(lastSession.date);
+        
+        // Calculate next strategy date from the last completed session
+        let nextDate = new Date(lastSessionDate);
+        nextDate.setDate(lastSessionDate.getDate() + 7); // Add 7 days for next week
+        
+        // Ensure it's on the correct day of the week
+        while (nextDate.getDay() !== targetDayIndex) {
+          nextDate.setDate(nextDate.getDate() + 1);
+        }
+        
+        return nextDate.toLocaleDateString();
+      } else {
+        // No completed sessions, calculate next occurrence of strategy day
+        let daysUntil = targetDayIndex - today.getDay();
+        if (daysUntil <= 0) daysUntil += 7;
+        
+        const nextDate = new Date(today);
+        nextDate.setDate(today.getDate() + daysUntil);
+        return nextDate.toLocaleDateString();
+      }
+    } catch (error) {
+      console.error('Error calculating next strategy date:', error);
+      return 'Not scheduled';
     }
   };
 
   const getDaysUntilNextStrategy = () => {
-    if (!strategySession || !strategySession.date) {
-      return 'N/A';
-    }
-
-    const sessionDate = new Date(strategySession.date);
-    const today = new Date();
-    const diffInTime = sessionDate.getTime() - today.getTime();
-    const diffInDays = Math.ceil(diffInTime / (1000 * 3600 * 24));
-
-    if (diffInDays >= 0) {
-      return diffInDays.toString();
-    } else {
+    try {
+      const strategyDay = localStorage.getItem('strategyDay') || 'Sunday';
+      const sessionHistoryString = localStorage.getItem('strategySessionHistory');
+      const sessionHistory: StrategySession[] = sessionHistoryString ? JSON.parse(sessionHistoryString) : [];
+      const currentSessionString = localStorage.getItem('currentStrategySession');
+      const currentSession = currentSessionString ? JSON.parse(currentSessionString) : null;
+      
+      const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+      const targetDayIndex = days.indexOf(strategyDay);
+      const today = new Date();
+      
+      // If there's an active session today
+      if (currentSession && !currentSession.completed) {
+        const sessionDate = new Date(currentSession.date);
+        const isToday = sessionDate.toDateString() === today.toDateString();
+        if (isToday) {
+          return '0';
+        }
+      }
+      
+      // Find the most recent completed session
+      const completedSessions = sessionHistory.filter(session => session.completed);
+      
+      if (completedSessions.length > 0) {
+        completedSessions.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+        const lastSession = completedSessions[0];
+        const lastSessionDate = new Date(lastSession.date);
+        
+        let nextDate = new Date(lastSessionDate);
+        nextDate.setDate(lastSessionDate.getDate() + 7);
+        
+        while (nextDate.getDay() !== targetDayIndex) {
+          nextDate.setDate(nextDate.getDate() + 1);
+        }
+        
+        const diffInTime = nextDate.getTime() - today.getTime();
+        const diffInDays = Math.ceil(diffInTime / (1000 * 3600 * 24));
+        return diffInDays.toString();
+      } else {
+        let daysUntil = targetDayIndex - today.getDay();
+        if (daysUntil <= 0) daysUntil += 7;
+        return daysUntil.toString();
+      }
+    } catch (error) {
+      console.error('Error calculating days until next strategy:', error);
       return 'N/A';
     }
   };
@@ -132,9 +197,8 @@ export const Dashboard = () => {
   
     try {
       const timeLogs = JSON.parse(timeLogsString);
-      // Sort by timestamp in descending order to get the most recent logs
       const sortedLogs = timeLogs.sort((a: any, b: any) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
-      return sortedLogs.slice(0, 5); // Get the 5 most recent logs
+      return sortedLogs.slice(0, 5);
     } catch (error) {
       console.error("Error parsing timeLogs from localStorage:", error);
       return [];
