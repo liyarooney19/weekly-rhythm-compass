@@ -293,11 +293,16 @@ export const TimeTracker = () => {
   const selectedProjectData = projects.find(p => p.id.toString() === selectedProject);
   const availableTasks = selectedProjectData?.tasks || [];
 
-  // Handle project change - clear task if it doesn't exist in new project
+  // Handle project change - clear task when project changes
   const handleProjectChange = (projectId: string) => {
     console.log('handleProjectChange called with:', projectId);
     setSelectedProject(projectId);
-    setSelectedTask(''); // Always clear task when project changes for simplicity
+    setSelectedTask(''); // Clear task when project changes
+  };
+
+  const handleTaskChange = (taskId: string) => {
+    console.log('handleTaskChange called with:', taskId);
+    setSelectedTask(taskId);
   };
 
   console.log('About to render, selectedProjectData:', selectedProjectData);
@@ -356,12 +361,12 @@ export const TimeTracker = () => {
               {selectedProjectData && (
                 <div>
                   <label className="block text-sm font-medium mb-2">Task</label>
-                  <Select value={selectedTask} onValueChange={setSelectedTask}>
+                  <Select value={selectedTask} onValueChange={handleTaskChange}>
                     <SelectTrigger>
                       <SelectValue placeholder="Select a task (optional)..." />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">General project work</SelectItem>
+                      <SelectItem value="general">General project work</SelectItem>
                       {availableTasks.map((task) => (
                         <SelectItem key={task.id} value={task.id.toString()}>
                           {task.name}
