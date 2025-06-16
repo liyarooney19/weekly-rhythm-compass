@@ -1,11 +1,11 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { Calendar, ChevronDown, Plus, Edit, Save, X, Clock, CheckCircle } from 'lucide-react';
+import { Calendar, ChevronDown, Plus, Edit, Save, X, Clock, CheckCircle, FileText } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 interface AgendaItem {
@@ -13,21 +13,23 @@ interface AgendaItem {
   title: string;
   completed: boolean;
   isExpanded: boolean;
+  notes: string;
 }
 
 interface StrategySession {
   date: string;
   completed: boolean;
   completedItems: string[];
+  agendaItems: AgendaItem[];
 }
 
 const defaultAgendaItems: AgendaItem[] = [
-  { id: '1', title: 'Review and clean up notes and drafts', completed: false, isExpanded: false },
-  { id: '2', title: 'Update list of dissatisfactions', completed: false, isExpanded: false },
-  { id: '3', title: 'Adjust priorities of current projects', completed: false, isExpanded: false },
-  { id: '4', title: 'Reflect on time spent/invested last week', completed: false, isExpanded: false },
-  { id: '5', title: 'Adjust project tasks for coming week', completed: false, isExpanded: false },
-  { id: '6', title: 'Plan in Pomodoro tracker and assign time estimates', completed: false, isExpanded: false }
+  { id: '1', title: 'Review and clean up notes and drafts', completed: false, isExpanded: false, notes: '' },
+  { id: '2', title: 'Update list of dissatisfactions', completed: false, isExpanded: false, notes: '' },
+  { id: '3', title: 'Adjust priorities of current projects', completed: false, isExpanded: false, notes: '' },
+  { id: '4', title: 'Reflect on time spent/invested last week', completed: false, isExpanded: false, notes: '' },
+  { id: '5', title: 'Adjust project tasks for coming week', completed: false, isExpanded: false, notes: '' },
+  { id: '6', title: 'Plan in Pomodoro tracker and assign time estimates', completed: false, isExpanded: false, notes: '' }
 ];
 
 export const WeeklyStrategyHub = () => {
@@ -51,7 +53,12 @@ export const WeeklyStrategyHub = () => {
       if (savedAgenda) {
         const parsed = JSON.parse(savedAgenda);
         if (Array.isArray(parsed)) {
-          setAgendaItems(parsed);
+          // Ensure existing items have notes property
+          const updatedItems = parsed.map(item => ({
+            ...item,
+            notes: item.notes || ''
+          }));
+          setAgendaItems(updatedItems);
         }
       }
 
@@ -94,13 +101,14 @@ export const WeeklyStrategyHub = () => {
     const newSession: StrategySession = {
       date: new Date().toISOString().split('T')[0],
       completed: false,
-      completedItems: []
+      completedItems: [],
+      agendaItems: agendaItems.map(item => ({ ...item, completed: false, notes: '' }))
     };
     setCurrentSession(newSession);
     localStorage.setItem('currentStrategySession', JSON.stringify(newSession));
     
     // Reset all agenda items
-    const resetItems = agendaItems.map(item => ({ ...item, completed: false }));
+    const resetItems = agendaItems.map(item => ({ ...item, completed: false, notes: '' }));
     saveAgenda(resetItems);
 
     toast({
@@ -115,7 +123,8 @@ export const WeeklyStrategyHub = () => {
     const completedSession = {
       ...currentSession,
       completed: true,
-      completedItems: agendaItems.filter(item => item.completed).map(item => item.id)
+      completedItems: agendaItems.filter(item => item.completed).map(item => item.id),
+      agendaItems: [...agendaItems] // Save current state of agenda items with notes
     };
 
     const updatedHistory = [...sessionHistory, completedSession];
@@ -129,6 +138,13 @@ export const WeeklyStrategyHub = () => {
       title: "Session Completed",
       description: "Your strategy session has been saved to history"
     });
+  };
+
+  const updateAgendaNotes = (itemId: string, notes: string) => {
+    const updatedItems = agendaItems.map(item =>
+      item.id === itemId ? { ...item, notes } : item
+    );
+    saveAgenda(updatedItems);
   };
 
   const toggleAgendaItem = (itemId: string) => {
@@ -173,7 +189,8 @@ export const WeeklyStrategyHub = () => {
       id: Date.now().toString(),
       title: newItemText.trim(),
       completed: false,
-      isExpanded: false
+      isExpanded: false,
+      notes: ''
     };
 
     const updatedItems = [...agendaItems, newItem];
@@ -339,7 +356,10 @@ export const WeeklyStrategyHub = () => {
                           <span className={`flex-1 ${item.completed ? 'line-through text-slate-500' : ''}`}>
                             {item.title}
                           </span>
-                          <ChevronDown className={`h-4 w-4 transition-transform ${item.isExpanded ? 'rotate-180' : ''}`} />
+                          <div className="flex items-center gap-2">
+                            {item.notes && <FileText className="h-3 w-3 text-slate-400" />}
+                            <ChevronDown className={`h-4 w-4 transition-transform ${item.isExpanded ? 'rotate-180' : ''}`} />
+                          </div>
                         </CollapsibleTrigger>
                         
                         <Button size="sm" variant="outline" onClick={() => startEditItem(item)}>
@@ -353,9 +373,16 @@ export const WeeklyStrategyHub = () => {
                   </div>
                   
                   <CollapsibleContent className="mt-3">
-                    <div className="pl-6 text-sm text-slate-600 border-l-2 border-slate-200">
-                      <p>Use this space for notes, thoughts, or action items related to: "{item.title}"</p>
-                      <p className="text-xs mt-1">Click to expand and add your session notes here.</p>
+                    <div className="pl-6 space-y-3">
+                      <div className="text-sm text-slate-600 border-l-2 border-slate-200 pl-3">
+                        <p className="font-medium mb-2">Session Notes:</p>
+                        <Textarea
+                          placeholder="Add your notes and thoughts for this agenda item..."
+                          value={item.notes}
+                          onChange={(e) => updateAgendaNotes(item.id, e.target.value)}
+                          className="min-h-20"
+                        />
+                      </div>
                     </div>
                   </CollapsibleContent>
                 </div>
@@ -380,17 +407,45 @@ export const WeeklyStrategyHub = () => {
             <CardTitle>Session History</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="space-y-2">
+            <div className="space-y-4">
               {sessionHistory.slice(-5).reverse().map((session, index) => (
-                <div key={index} className="flex items-center justify-between p-3 border rounded-lg">
-                  <div>
-                    <div className="font-medium">{new Date(session.date).toLocaleDateString()}</div>
-                    <div className="text-sm text-slate-600">
-                      {session.completedItems.length} items completed
-                    </div>
+                <Collapsible key={index}>
+                  <div className="border rounded-lg p-3">
+                    <CollapsibleTrigger className="w-full">
+                      <div className="flex items-center justify-between">
+                        <div className="text-left">
+                          <div className="font-medium">{new Date(session.date).toLocaleDateString()}</div>
+                          <div className="text-sm text-slate-600">
+                            {session.completedItems.length} items completed
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <CheckCircle className="h-5 w-5 text-green-500" />
+                          <ChevronDown className="h-4 w-4" />
+                        </div>
+                      </div>
+                    </CollapsibleTrigger>
+                    <CollapsibleContent className="mt-3">
+                      <div className="space-y-2 border-t pt-3">
+                        {session.agendaItems?.map((item) => (
+                          <div key={item.id} className="pl-4">
+                            <div className={`flex items-start gap-2 text-sm ${item.completed ? 'text-green-600' : 'text-slate-500'}`}>
+                              <CheckCircle className={`h-3 w-3 mt-0.5 ${item.completed ? 'text-green-500' : 'text-slate-300'}`} />
+                              <div className="flex-1">
+                                <div className={item.completed ? 'line-through' : ''}>{item.title}</div>
+                                {item.notes && (
+                                  <div className="mt-1 text-xs text-slate-600 bg-slate-50 p-2 rounded">
+                                    {item.notes}
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </CollapsibleContent>
                   </div>
-                  <CheckCircle className="h-5 w-5 text-green-500" />
-                </div>
+                </Collapsible>
               ))}
             </div>
           </CardContent>
