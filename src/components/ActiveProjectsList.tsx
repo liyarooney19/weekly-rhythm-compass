@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -56,6 +55,13 @@ export const ActiveProjectsList = () => {
     if (savedTimeLogs) {
       const parsedTimeLogs = JSON.parse(savedTimeLogs);
       console.log('ActiveProjectsList - Unique project names in timeLogs:', [...new Set(parsedTimeLogs.map(log => log.project))]);
+      console.log('ActiveProjectsList - All time logs:', parsedTimeLogs.map(log => ({ 
+        project: log.project, 
+        task: log.task, 
+        timestamp: log.timestamp,
+        projectLength: log.project ? log.project.length : 0,
+        projectBytes: log.project ? Array.from(log.project).map(c => c.charCodeAt(0)) : []
+      })));
       setTimeLogs(parsedTimeLogs);
     }
   };
@@ -70,6 +76,8 @@ export const ActiveProjectsList = () => {
     startOfWeek.setHours(0, 0, 0, 0);
 
     console.log('ActiveProjectsList - Getting hours for project:', projectName);
+    console.log('ActiveProjectsList - Project name length:', projectName.length);
+    console.log('ActiveProjectsList - Project name bytes:', Array.from(projectName).map(c => c.charCodeAt(0)));
     console.log('ActiveProjectsList - Week starts Monday:', startOfWeek.toLocaleDateString());
 
     // Filter time logs for this week and this project
@@ -77,13 +85,22 @@ export const ActiveProjectsList = () => {
       const logDate = new Date(log.timestamp);
       const isThisWeek = logDate >= startOfWeek;
       
-      // Match by project name in the log
-      const matchesProject = log.project === projectName;
+      // Match by project name in the log with detailed comparison
+      const logProject = log.project || '';
+      const exactMatch = logProject === projectName;
+      const trimmedMatch = logProject.trim() === projectName.trim();
+      const lowerCaseMatch = logProject.toLowerCase() === projectName.toLowerCase();
       
-      console.log('ActiveProjectsList - Checking log for project "' + projectName + '":', {
-        logProject: log.project,
+      console.log('ActiveProjectsList - Detailed matching for project "' + projectName + '":', {
+        logProject: logProject,
+        logProjectLength: logProject.length,
+        logProjectBytes: Array.from(logProject).map(c => c.charCodeAt(0)),
         projectName: projectName,
-        matchesProject: matchesProject,
+        projectNameLength: projectName.length,
+        projectNameBytes: Array.from(projectName).map(c => c.charCodeAt(0)),
+        exactMatch: exactMatch,
+        trimmedMatch: trimmedMatch,
+        lowerCaseMatch: lowerCaseMatch,
         logDate: logDate.toLocaleDateString(),
         isThisWeek: isThisWeek,
         logDuration: log.duration,
@@ -91,7 +108,7 @@ export const ActiveProjectsList = () => {
         logTask: log.task
       });
       
-      return isThisWeek && matchesProject;
+      return isThisWeek && (exactMatch || trimmedMatch || lowerCaseMatch);
     });
 
     console.log('ActiveProjectsList - This week logs for "' + projectName + '":', thisWeekLogs);
