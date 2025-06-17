@@ -1,9 +1,10 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Calendar, Clock, Target, CheckCircle2, AlertCircle, CalendarDays, TrendingUp } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Calendar, Clock, Target, CheckCircle2, AlertCircle, CalendarDays, TrendingUp, Trash2 } from 'lucide-react';
 import { ActiveProjectsList } from './ActiveProjectsList';
+import { useToast } from '@/hooks/use-toast';
 
 interface Project {
   id: string;
@@ -37,12 +38,32 @@ interface StrategySession {
 }
 
 export const Dashboard = () => {
+  const { toast } = useToast();
   const [projects, setProjects] = useState<Project[]>([]);
   const [timeLogs, setTimeLogs] = useState<TimeLog[]>([]);
 
   useEffect(() => {
     loadData();
   }, []);
+
+  const clearAllTrackingData = () => {
+    // Clear all tracking related data
+    localStorage.removeItem('timeLogs');
+    localStorage.removeItem('weeklyTasks');
+    localStorage.removeItem('strategySessionHistory');
+    localStorage.removeItem('currentStrategySession');
+    localStorage.removeItem('readingEntries');
+    localStorage.removeItem('writingEntries');
+    localStorage.removeItem('leisureEntries');
+    
+    // Reload data to refresh the dashboard
+    loadData();
+    
+    toast({
+      title: "Data Cleared",
+      description: "All tracking data has been cleared for testing"
+    });
+  };
 
   const loadData = () => {
     const savedProjects = localStorage.getItem('projects');
@@ -220,9 +241,19 @@ export const Dashboard = () => {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div>
-        <h1 className="text-3xl font-bold text-slate-800 mb-2">Dashboard</h1>
-        <p className="text-slate-600">Your productivity overview and quick actions</p>
+      <div className="flex justify-between items-start">
+        <div>
+          <h1 className="text-3xl font-bold text-slate-800 mb-2">Dashboard</h1>
+          <p className="text-slate-600">Your productivity overview and quick actions</p>
+        </div>
+        <Button 
+          variant="outline" 
+          onClick={clearAllTrackingData}
+          className="text-red-600 hover:text-red-700 hover:bg-red-50"
+        >
+          <Trash2 className="h-4 w-4 mr-2" />
+          Clear All Data
+        </Button>
       </div>
 
       {/* Quick Stats */}
