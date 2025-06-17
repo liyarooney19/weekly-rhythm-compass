@@ -95,36 +95,74 @@ export const ActiveProjectsList = () => {
       });
     });
 
-    // Process time logs
-    thisWeekLogs.forEach(log => {
-      const projectName = log.project;
+    // Helper function to find matching project for a log
+    const findMatchingProject = (logProjectName: string): string | null => {
+      // First try exact match
+      if (projectDataMap.has(logProjectName)) {
+        return logProjectName;
+      }
       
-      if (projectName && projectDataMap.has(projectName)) {
-        const projectData = projectDataMap.get(projectName)!;
-        const hours = (log.duration || 0) / 60; // Convert minutes to hours, handle undefined
-        
-        // Add to totals
-        projectData.totalHours += hours;
-        if (log.type === 'invested') {
-          projectData.investedHours += hours;
-        } else {
-          projectData.spentHours += hours;
+      // Then try to find a project that contains the log project name
+      for (const projectName of projectDataMap.keys()) {
+        if (projectName.toLowerCase().includes(logProjectName.toLowerCase()) || 
+            logProjectName.toLowerCase().includes(projectName.toLowerCase())) {
+          return projectName;
+        }
+      }
+      
+      // Finally, try to match by extracting the base name from parentheses
+      for (const projectName of projectDataMap.keys()) {
+        // Extract text in parentheses from project name
+        const parenthesesMatch = projectName.match(/\(([^)]+)\)/);
+        if (parenthesesMatch && parenthesesMatch[1].toLowerCase() === logProjectName.toLowerCase()) {
+          return projectName;
         }
         
-        // Add task entry
-        projectData.taskEntries.push({
-          taskName: log.task,
-          duration: hours,
-          type: log.type
-        });
+        // Also check if the log project name matches the base name (before parentheses)
+        const baseName = projectName.split('(')[0].trim();
+        if (baseName.toLowerCase() === logProjectName.toLowerCase()) {
+          return projectName;
+        }
+      }
+      
+      return null;
+    };
+
+    // Process time logs
+    thisWeekLogs.forEach(log => {
+      const logProjectName = log.project;
+      
+      if (logProjectName) {
+        const matchingProjectName = findMatchingProject(logProjectName);
         
-        console.log(`Added ${hours}h of ${log.type} time for project "${projectName}", task "${log.task}"`);
-      } else {
-        console.log(`Log not matched to any project:`, { 
-          logProject: log.project, 
-          logTask: log.task,
-          availableProjects: projects.map(p => p.name)
-        });
+        if (matchingProjectName && projectDataMap.has(matchingProjectName)) {
+          const projectData = projectDataMap.get(matchingProjectName)!;
+          const hours = (log.duration || 0) / 60; // Convert minutes to hours, handle undefined
+          
+          // Add to totals
+          projectData.totalHours += hours;
+          if (log.type === 'invested') {
+            projectData.investedHours += hours;
+          } else {
+            projectData.spentHours += hours;
+          }
+          
+          // Add task entry
+          projectData.taskEntries.push({
+            taskName: log.task,
+            duration: hours,
+            type: log.type
+          });
+          
+          console.log(`Matched log project "${logProjectName}" to project "${matchingProjectName}"`);
+          console.log(`Added ${hours}h of ${log.type} time for project "${matchingProjectName}", task "${log.task}"`);
+        } else {
+          console.log(`Log not matched to any project:`, { 
+            logProject: logProjectName, 
+            logTask: log.task,
+            availableProjects: projects.map(p => p.name)
+          });
+        }
       }
     });
 
