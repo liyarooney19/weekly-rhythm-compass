@@ -46,51 +46,8 @@ export const ActiveProjectsList = () => {
     const savedProjects = localStorage.getItem('projects');
     if (savedProjects) {
       const parsedProjects = JSON.parse(savedProjects);
-      
-      // Check if Self Development project exists and its status
-      const selfDevProject = parsedProjects.find(p => p.name === 'Self Development');
-      console.log('ActiveProjectsList - "Self Development" project found:', selfDevProject);
-      
-      if (!selfDevProject) {
-        console.log('ActiveProjectsList - "Self Development" project does not exist in projects list');
-        // Create Self Development project if it doesn't exist but has time logs
-        const savedTimeLogs = localStorage.getItem('timeLogs');
-        if (savedTimeLogs) {
-          const parsedTimeLogs = JSON.parse(savedTimeLogs);
-          const selfDevLogs = parsedTimeLogs.filter(log => log.project === 'Self Development');
-          
-          if (selfDevLogs.length > 0) {
-            console.log('ActiveProjectsList - Creating missing "Self Development" project');
-            const selfDevProject = {
-              id: `self-dev-${Date.now()}`,
-              name: 'Self Development',
-              lifeArea: 'Personal Growth',
-              status: 'active',
-              tasks: []
-            };
-            parsedProjects.push(selfDevProject);
-            localStorage.setItem('projects', JSON.stringify(parsedProjects));
-          }
-        }
-      } else if (selfDevProject.status !== 'active' && !selfDevProject.status) {
-        console.log('ActiveProjectsList - "Self Development" project exists but status is:', selfDevProject.status);
-        // Make sure Self Development is active if it has recent time logs
-        const savedTimeLogs = localStorage.getItem('timeLogs');
-        if (savedTimeLogs) {
-          const parsedTimeLogs = JSON.parse(savedTimeLogs);
-          const selfDevLogs = parsedTimeLogs.filter(log => log.project === 'Self Development');
-          
-          if (selfDevLogs.length > 0) {
-            selfDevProject.status = 'active';
-            localStorage.setItem('projects', JSON.stringify(parsedProjects));
-            console.log('ActiveProjectsList - Updated "Self Development" project status to active');
-          }
-        }
-      }
-      
       const activeProjects = parsedProjects.filter((p: Project) => p.status === 'active' || !p.status);
-      console.log('ActiveProjectsList - Active projects after processing:', activeProjects.map(p => p.name));
-      
+      console.log('ActiveProjectsList - Active projects:', activeProjects.map(p => p.name));
       setProjects(activeProjects);
     }
 
@@ -116,24 +73,17 @@ export const ActiveProjectsList = () => {
     console.log('ActiveProjectsList - Week starts Monday:', startOfWeek.toLocaleDateString());
 
     // Filter time logs for this week and this project
-    // Match by either project name or by task names that belong to this project
     const thisWeekLogs = timeLogs.filter(log => {
       const logDate = new Date(log.timestamp);
       const isThisWeek = logDate >= startOfWeek;
       
-      // Try to match by project name in the log
+      // Match by project name in the log
       const matchesProject = log.project === projectName;
-      
-      // Also try to match by checking if the task belongs to this project
-      const currentProject = projects.find(p => p.name === projectName);
-      const matchesTask = currentProject?.tasks.some(task => task.name === log.task) || false;
       
       console.log('ActiveProjectsList - Checking log for project "' + projectName + '":', {
         logProject: log.project,
         projectName: projectName,
-        exactMatch: log.project === projectName,
         matchesProject: matchesProject,
-        matchesTask: matchesTask,
         logDate: logDate.toLocaleDateString(),
         isThisWeek: isThisWeek,
         logDuration: log.duration,
@@ -141,7 +91,7 @@ export const ActiveProjectsList = () => {
         logTask: log.task
       });
       
-      return isThisWeek && (matchesProject || matchesTask);
+      return isThisWeek && matchesProject;
     });
 
     console.log('ActiveProjectsList - This week logs for "' + projectName + '":', thisWeekLogs);
