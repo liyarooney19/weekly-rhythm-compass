@@ -236,6 +236,21 @@ export const Dashboard = () => {
     return `${mins}m`;
   };
 
+  const formatActivityDate = (timestamp: string) => {
+    const date = new Date(timestamp);
+    const today = new Date();
+    const yesterday = new Date(today);
+    yesterday.setDate(yesterday.getDate() - 1);
+    
+    if (date.toDateString() === today.toDateString()) {
+      return 'Today';
+    } else if (date.toDateString() === yesterday.toDateString()) {
+      return 'Yesterday';
+    } else {
+      return date.toLocaleDateString();
+    }
+  };
+
   const weeklyTime = getWeeklyTimeData();
 
   return (
@@ -322,31 +337,62 @@ export const Dashboard = () => {
             Recent Activity
           </CardTitle>
         </CardHeader>
-        <CardContent className="space-y-4">
+        <CardContent className="space-y-3">
           {getRecentActivity().length === 0 ? (
             <div className="text-center py-8 text-slate-500">
               <AlertCircle className="h-10 w-10 mx-auto mb-2 text-slate-400" />
               <p>No recent activity found.</p>
+              <p className="text-sm">Start logging time to see your activity here!</p>
             </div>
           ) : (
-            <ul className="space-y-2">
+            <div className="space-y-3">
               {getRecentActivity().map((activity: any) => (
-                <li key={activity.id} className="flex items-center justify-between p-3 bg-slate-50 rounded-lg hover:bg-slate-100 transition-colors">
-                  <div>
-                    <div className="font-medium text-slate-800">
-                      {activity.task}
+                <div key={activity.id} className="border border-slate-200 rounded-lg p-4 hover:bg-slate-50 transition-colors">
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-1">
+                        <h4 className="font-semibold text-slate-800 truncate">{activity.task}</h4>
+                        <Badge 
+                          variant="secondary" 
+                          className={`text-xs ${
+                            activity.type === 'invested' 
+                              ? 'bg-green-100 text-green-800 border-green-200' 
+                              : 'bg-amber-100 text-amber-800 border-amber-200'
+                          }`}
+                        >
+                          {activity.type === 'invested' ? 'Invested' : 'Spent'}
+                        </Badge>
+                      </div>
+                      
+                      <div className="flex items-center gap-4 text-sm text-slate-600">
+                        {activity.project && (
+                          <div className="flex items-center gap-1">
+                            <Target className="h-3 w-3" />
+                            <span className="truncate">{activity.project}</span>
+                          </div>
+                        )}
+                        <div className="flex items-center gap-1">
+                          <Calendar className="h-3 w-3" />
+                          <span>{formatActivityDate(activity.timestamp)}</span>
+                        </div>
+                      </div>
                     </div>
-                    <div className="text-sm text-slate-500">
-                      {activity.project && `${activity.project} - `}
-                      {new Date(activity.timestamp).toLocaleDateString()} - {formatTime(activity.duration)}
+                    
+                    <div className="text-right ml-4">
+                      <div className="text-lg font-bold text-slate-800">
+                        {formatTime(activity.duration)}
+                      </div>
+                      <div className="text-xs text-slate-500">
+                        {new Date(activity.timestamp).toLocaleTimeString([], { 
+                          hour: '2-digit', 
+                          minute: '2-digit' 
+                        })}
+                      </div>
                     </div>
                   </div>
-                  <Badge variant="secondary" className={activity.type === 'invested' ? 'bg-green-100 text-green-800' : 'bg-amber-100 text-amber-800'}>
-                    {activity.type === 'invested' ? 'Invested' : 'Spent'}
-                  </Badge>
-                </li>
+                </div>
               ))}
-            </ul>
+            </div>
           )}
         </CardContent>
       </Card>
