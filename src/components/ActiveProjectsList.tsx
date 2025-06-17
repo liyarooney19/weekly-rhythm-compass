@@ -49,7 +49,7 @@ export const ActiveProjectsList = () => {
       setProjects(parsedProjects.filter((p: Project) => p.status === 'active' || !p.status));
     }
 
-    // Load time logs
+    // Load time logs - our single source of truth
     const savedTimeLogs = localStorage.getItem('timeLogs');
     if (savedTimeLogs) {
       setTimeLogs(JSON.parse(savedTimeLogs));
@@ -62,6 +62,7 @@ export const ActiveProjectsList = () => {
     startOfWeek.setDate(now.getDate() - now.getDay()); // Start of current week (Sunday)
     startOfWeek.setHours(0, 0, 0, 0);
 
+    // Use ONLY timeLogs - unified data source
     const weeklyLogs = timeLogs.filter(log => {
       const logDate = new Date(log.timestamp);
       return logDate >= startOfWeek && log.project === projectName;

@@ -95,9 +95,6 @@ export const Dashboard = () => {
   const { toast } = useToast();
   const [projects, setProjects] = useState<Project[]>([]);
   const [timeLogs, setTimeLogs] = useState<TimeLog[]>([]);
-  const [leisureActivities, setLeisureActivities] = useState<LeisureActivity[]>([]);
-  const [readingEntries, setReadingEntries] = useState<ReadingEntry[]>([]);
-  const [writingEntries, setWritingEntries] = useState<WritingEntry[]>([]);
 
   useEffect(() => {
     loadData();
@@ -113,23 +110,6 @@ export const Dashboard = () => {
     if (savedTimeLogs) {
       setTimeLogs(JSON.parse(savedTimeLogs));
     }
-
-    const savedLeisureActivities = localStorage.getItem('leisureActivities');
-    if (savedLeisureActivities) {
-      const activities = JSON.parse(savedLeisureActivities);
-      console.log('Dashboard - Loaded leisure activities:', activities);
-      setLeisureActivities(activities);
-    }
-
-    const savedReadingEntries = localStorage.getItem('readingEntries');
-    if (savedReadingEntries) {
-      setReadingEntries(JSON.parse(savedReadingEntries));
-    }
-
-    const savedWritingEntries = localStorage.getItem('writingEntries');
-    if (savedWritingEntries) {
-      setWritingEntries(JSON.parse(savedWritingEntries));
-    }
   };
 
   const getWeeklyTimeData = () => {
@@ -138,9 +118,9 @@ export const Dashboard = () => {
     startOfWeek.setDate(now.getDate() - now.getDay());
     startOfWeek.setHours(0, 0, 0, 0);
 
-    console.log('Dashboard - Calculating weekly time from:', startOfWeek);
+    console.log('Dashboard - Calculating weekly time from timeLogs only');
 
-    // Get time from time logs (projects and tasks)
+    // Get time from time logs ONLY - this is now our single source of truth
     const weeklyLogs = timeLogs.filter(log => {
       const logDate = new Date(log.timestamp);
       return logDate >= startOfWeek;
@@ -154,46 +134,14 @@ export const Dashboard = () => {
       .filter(log => log.type === 'spent')
       .reduce((sum, log) => sum + log.duration, 0) / 60;
 
-    console.log('Dashboard - Time logs this week:', { timeLogInvested, timeLogSpent });
-
-    // Get time from leisure activity sessions
-    const leisureInvested = leisureActivities.reduce((total, activity) => {
-      const weeklyHours = activity.sessions
-        .filter(session => {
-          const sessionDate = new Date(session.date);
-          return sessionDate >= startOfWeek;
-        })
-        .reduce((sum, session) => sum + (session.duration / 60), 0);
-      
-      console.log(`Dashboard - ${activity.name} weekly hours:`, weeklyHours);
-      return total + weeklyHours;
-    }, 0);
-
-    console.log('Dashboard - Total leisure invested this week:', leisureInvested);
-
-    // Get time from reading sessions
-    const readingInvested = readingEntries.reduce((total, entry) => {
-      const weeklyHours = entry.sessions
-        .filter(session => {
-          const sessionDate = new Date(session.date);
-          return sessionDate >= startOfWeek;
-        })
-        .reduce((sum, session) => sum + (session.duration / 60), 0);
-      return total + weeklyHours;
-    }, 0);
-
-    const totalInvested = timeLogInvested + leisureInvested + readingInvested;
-    const totalSpent = timeLogSpent;
-
-    console.log('Dashboard - Final weekly totals:', { 
-      invested: totalInvested, 
-      spent: totalSpent,
-      breakdown: { timeLogInvested, leisureInvested, readingInvested, timeLogSpent }
+    console.log('Dashboard - Weekly totals from timeLogs:', { 
+      invested: timeLogInvested, 
+      spent: timeLogSpent 
     });
 
     return { 
-      invested: totalInvested, 
-      spent: totalSpent 
+      invested: timeLogInvested, 
+      spent: timeLogSpent 
     };
   };
 
@@ -302,74 +250,16 @@ export const Dashboard = () => {
   };
 
   const getRecentActivity = () => {
-    const allActivities: any[] = [];
-    
-    // Add time logs
-    timeLogs.forEach(log => {
-      allActivities.push({
-        id: log.id,
-        task: log.task,
-        project: log.project,
-        duration: log.duration,
-        type: log.type,
-        timestamp: log.timestamp,
-        source: 'timeLog'
-      });
-    });
-    
-    // Add leisure activities
-    leisureActivities.forEach(activity => {
-      activity.sessions.forEach(session => {
-        allActivities.push({
-          id: `leisure-${session.id}`,
-          task: activity.name,
-          project: activity.category,
-          duration: session.duration,
-          type: 'invested',
-          timestamp: session.date,
-          source: 'leisure'
-        });
-      });
-    });
-    
-    // Add reading sessions
-    readingEntries.forEach(entry => {
-      entry.sessions.forEach(session => {
-        allActivities.push({
-          id: `reading-${session.id}`,
-          task: `Reading: ${entry.title}`,
-          project: entry.category,
-          duration: session.duration,
-          type: 'invested',
-          timestamp: session.date,
-          source: 'reading'
-        });
-      });
-    });
-
-    // Add strategy sessions
-    try {
-      const sessionHistoryString = localStorage.getItem('strategySessionHistory');
-      const sessionHistory: StrategySession[] = sessionHistoryString ? JSON.parse(sessionHistoryString) : [];
-      
-      sessionHistory.forEach((session, index) => {
-        if (session.completed) {
-          // Calculate total time for the session (assuming 50 minutes as mentioned)
-          const sessionDuration = 50 * 60; // 50 minutes in seconds
-          allActivities.push({
-            id: `strategy-${index}`,
-            task: 'Self-Strategy session',
-            project: 'Self Development',
-            duration: sessionDuration,
-            type: 'invested',
-            timestamp: session.date,
-            source: 'strategy'
-          });
-        }
-      });
-    } catch (error) {
-      console.error('Error loading strategy sessions:', error);
-    }
+    // Only use timeLogs - single source of truth
+    const allActivities = timeLogs.map(log => ({
+      id: log.id,
+      task: log.task,
+      project: log.project,
+      duration: log.duration * 60, // Convert to seconds for consistency
+      type: log.type,
+      timestamp: log.timestamp,
+      source: 'timeLog'
+    }));
     
     // Sort by timestamp
     const sortedActivities = allActivities
