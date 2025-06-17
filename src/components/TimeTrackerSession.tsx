@@ -35,12 +35,17 @@ export const TimeTrackerSession = ({ timeLogs }: TimeTrackerSessionProps) => {
     const taskMap = new Map<string, CombinedTask>();
     
     logs.forEach(log => {
-      const key = `${log.task}-${log.type}-${log.project || 'no-project'}`;
+      // Create a unique key based on task name and type (but not project to combine across projects)
+      const key = `${log.task}-${log.type}`;
       
       if (taskMap.has(key)) {
         const existing = taskMap.get(key)!;
         existing.totalDuration += log.duration;
         existing.count += 1;
+        // If projects differ, don't show a specific project
+        if (existing.project !== log.project) {
+          existing.project = undefined;
+        }
       } else {
         taskMap.set(key, {
           task: log.task,
@@ -140,4 +145,3 @@ export const TimeTrackerSession = ({ timeLogs }: TimeTrackerSessionProps) => {
     </Card>
   );
 };
-
