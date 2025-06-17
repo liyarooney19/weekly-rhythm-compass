@@ -321,12 +321,12 @@ export const TimeTracker = () => {
   };
 
   const stopTimer = () => {
-    console.log('TimeTracker - stopTimer called, timer state:', { isRunning, timeLeft, customDuration });
-    if (isRunning && timeLeft < customDuration * 60) {
-      completeSession();
-    } else {
-      resetTimer();
-    }
+    console.log('TimeTracker - stopTimer called - resetting without logging time');
+    resetTimer();
+    toast({
+      title: "Session Cancelled",
+      description: "Timer stopped and reset without logging time"
+    });
   };
 
   const resetTimer = () => {
@@ -336,7 +336,7 @@ export const TimeTracker = () => {
     setTimeLeft(customDuration * 60);
     setStartTime(0);
     setActualStartTime(0);
-    setCurrentProjectName(''); // Reset project name
+    setCurrentProjectName('');
     localStorage.removeItem('timerState');
     
     toast({
@@ -348,18 +348,12 @@ export const TimeTracker = () => {
   const completeSessionWithState = (timerState: TimerState) => {
     console.log('TimeTracker - completeSessionWithState called with:', timerState);
     
-    const duration = timerState.customDuration * 60 - timerState.timeLeft;
+    // Only complete if the timer actually finished (reached zero)
+    const duration = timerState.customDuration * 60;
     const durationInMinutes = Math.round(duration / 60);
     
-    console.log('TimeTracker - Session duration calculated:', { duration, durationInMinutes });
-    
-    if (durationInMinutes < 1) {
-      console.log('TimeTracker - Duration less than 1 minute, resetting timer');
-      resetTimer();
-      return;
-    }
+    console.log('TimeTracker - Full session duration recorded:', { duration, durationInMinutes });
 
-    // Use the stored project name from timer state
     const projectName = timerState.currentProjectName;
     
     const newLog: TimeLog = {
@@ -368,7 +362,7 @@ export const TimeTracker = () => {
       duration: durationInMinutes,
       type: timerState.timeType,
       timestamp: new Date().toISOString(),
-      project: projectName, // Use the stored project name
+      project: projectName,
       taskId: timerState.selectedTaskId || undefined
     };
 
@@ -382,26 +376,25 @@ export const TimeTracker = () => {
     localStorage.setItem('timeLogs', JSON.stringify(updatedLogs));
 
     updateProjectHours(timerState.selectedProject, timerState.selectedTaskId, durationInMinutes, timerState.timeType);
+    
+    toast({
+      title: "Session Completed!",
+      description: `Logged ${durationInMinutes} minutes of ${timerState.timeType} time`
+    });
+    
     resetTimer();
   };
 
   const completeSession = () => {
-    console.log('TimeTracker - completeSession called');
+    console.log('TimeTracker - completeSession called - timer reached zero naturally');
     
-    const duration = customDuration * 60 - timeLeft;
+    // Record the full session duration since timer reached zero
+    const duration = customDuration * 60;
     const durationInMinutes = Math.round(duration / 60);
     
-    console.log('TimeTracker - Session duration calculated:', { duration, durationInMinutes });
-    
-    if (durationInMinutes < 1) {
-      console.log('TimeTracker - Duration less than 1 minute, resetting timer');
-      resetTimer();
-      return;
-    }
+    console.log('TimeTracker - Full session duration recorded:', { duration, durationInMinutes });
 
     const selectedTask = getSelectedTask();
-
-    console.log('TimeTracker - Selected data for completion:', { selectedTask, currentProjectName });
 
     const newLog: TimeLog = {
       id: Date.now().toString(),
@@ -409,7 +402,7 @@ export const TimeTracker = () => {
       duration: durationInMinutes,
       type: timeType,
       timestamp: new Date().toISOString(),
-      project: currentProjectName, // Use the stored project name instead of looking it up
+      project: currentProjectName,
       taskId: selectedTaskId || undefined
     };
 
