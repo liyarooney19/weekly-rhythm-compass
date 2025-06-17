@@ -374,9 +374,10 @@ export const LeisureTracker = () => {
     const updatedActivities = activities.filter(activity => activity.id !== id);
     saveActivities(updatedActivities);
 
-    // Also remove from projects if it exists
+    // Remove from projects and clean up time logs
     if (activityToDelete) {
       removeFromProjects(activityToDelete.name);
+      removeTimeLogsForActivity(activityToDelete.name);
     }
 
     toast({
@@ -397,6 +398,22 @@ export const LeisureTracker = () => {
       localStorage.setItem('projects', JSON.stringify(updatedProjects));
     } catch (error) {
       console.error('Error removing leisure project:', error);
+    }
+  };
+
+  const removeTimeLogsForActivity = (activityName: string) => {
+    const savedTimeLogs = localStorage.getItem('timeLogs');
+    if (!savedTimeLogs) return;
+
+    try {
+      const timeLogs = JSON.parse(savedTimeLogs);
+      const updatedTimeLogs = timeLogs.filter((log: any) => 
+        log.project !== activityName
+      );
+      localStorage.setItem('timeLogs', JSON.stringify(updatedTimeLogs));
+      console.log('Removed time logs for activity:', activityName);
+    } catch (error) {
+      console.error('Error removing time logs for activity:', error);
     }
   };
 
