@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -147,12 +148,22 @@ export const ActiveProjectsList = () => {
             projectData.spentHours += hours;
           }
           
-          // Add task entry
-          projectData.taskEntries.push({
-            taskName: log.task,
-            duration: hours,
-            type: log.type
-          });
+          // Find existing task entry or create new one
+          const existingTaskIndex = projectData.taskEntries.findIndex(
+            entry => entry.taskName === log.task && entry.type === log.type
+          );
+          
+          if (existingTaskIndex !== -1) {
+            // Add to existing task entry
+            projectData.taskEntries[existingTaskIndex].duration += hours;
+          } else {
+            // Create new task entry
+            projectData.taskEntries.push({
+              taskName: log.task,
+              duration: hours,
+              type: log.type
+            });
+          }
           
           console.log(`Matched log project "${logProjectName}" to project "${matchingProjectName}"`);
           console.log(`Added ${hours}h of ${log.type} time for project "${matchingProjectName}", task "${log.task}"`);
