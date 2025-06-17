@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -47,6 +46,8 @@ export const ActiveProjectsList = () => {
     if (savedProjects) {
       const parsedProjects = JSON.parse(savedProjects);
       const activeProjects = parsedProjects.filter((p: Project) => p.status === 'active' || !p.status);
+      console.log('ActiveProjectsList - All projects:', parsedProjects);
+      console.log('ActiveProjectsList - Active projects:', activeProjects);
       setProjects(activeProjects);
     }
 
@@ -54,6 +55,7 @@ export const ActiveProjectsList = () => {
     const savedTimeLogs = localStorage.getItem('timeLogs');
     if (savedTimeLogs) {
       const parsedTimeLogs = JSON.parse(savedTimeLogs);
+      console.log('ActiveProjectsList - All time logs:', parsedTimeLogs);
       setTimeLogs(parsedTimeLogs);
     }
   };
@@ -63,7 +65,7 @@ export const ActiveProjectsList = () => {
     // Get Monday of this week
     const startOfWeek = new Date(now);
     const dayOfWeek = startOfWeek.getDay();
-    const daysToMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1; // If Sunday (0), go back 6 days; otherwise go back (dayOfWeek - 1) days
+    const daysToMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
     startOfWeek.setDate(startOfWeek.getDate() - daysToMonday);
     startOfWeek.setHours(0, 0, 0, 0);
 
@@ -82,9 +84,11 @@ export const ActiveProjectsList = () => {
         projectName: projectName,
         matchesProject: matchesProject,
         logDate: logDate.toLocaleDateString(),
+        logTime: logDate.toLocaleTimeString(),
         isThisWeek: isThisWeek,
         logDuration: log.duration,
-        logType: log.type
+        logType: log.type,
+        logTask: log.task
       });
       
       return isThisWeek && matchesProject;
@@ -92,13 +96,33 @@ export const ActiveProjectsList = () => {
 
     console.log('ActiveProjectsList - This week logs for', projectName, ':', thisWeekLogs);
 
+    // Also check if any logs match by task name instead of project name
+    const taskMatchLogs = timeLogs.filter(log => {
+      const logDate = new Date(log.timestamp);
+      const isThisWeek = logDate >= startOfWeek;
+      const matchesTask = log.task === projectName || log.task?.toLowerCase().includes(projectName.toLowerCase());
+      
+      if (matchesTask && isThisWeek) {
+        console.log('ActiveProjectsList - Found task match:', {
+          logTask: log.task,
+          projectName: projectName,
+          logDuration: log.duration,
+          logType: log.type
+        });
+      }
+      
+      return isThisWeek && matchesTask;
+    });
+
+    console.log('ActiveProjectsList - Task match logs for', projectName, ':', taskMatchLogs);
+
     const invested = thisWeekLogs
       .filter(log => log.type === 'invested')
-      .reduce((sum, log) => sum + log.duration, 0) / 60; // Convert to hours
+      .reduce((sum, log) => sum + log.duration, 0) / 60;
 
     const spent = thisWeekLogs
       .filter(log => log.type === 'spent')
-      .reduce((sum, log) => sum + log.duration, 0) / 60; // Convert to hours
+      .reduce((sum, log) => sum + log.duration, 0) / 60;
 
     console.log('ActiveProjectsList - Final hours for', projectName, ':', { invested, spent, total: invested + spent });
 
