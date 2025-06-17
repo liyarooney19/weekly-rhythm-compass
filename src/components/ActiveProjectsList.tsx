@@ -86,20 +86,22 @@ export const ActiveProjectsList = () => {
       const logProject = log.project || '';
       const taskName = log.task || '';
       
-      // Strategy 1: Exact project match (most common case)
+      // Strategy 1: Exact project match (when log has project field)
       const exactProjectMatch = logProject === projectName;
       
-      // Strategy 2: Case insensitive project match
+      // Strategy 2: Case insensitive project match (when log has project field)
       const caseInsensitiveProjectMatch = logProject.toLowerCase() === projectName.toLowerCase();
       
-      // Strategy 3: For leisure activities only - check if leisure task matches leisure project
-      // Only applies when project has format "Leisure (activity)" and task is the activity name
+      // Strategy 3: Task name matches project name (for time tracker logs without project field)
+      const taskNameMatchesProject = taskName.toLowerCase() === projectName.toLowerCase();
+      
+      // Strategy 4: For leisure activities - check if leisure task matches leisure project
       const isLeisureProjectMatch = projectName.startsWith('Leisure (') && 
                                     projectName.endsWith(')') &&
                                     logProject === '' && // leisure logs don't have project field
                                     taskName.toLowerCase() === projectName.slice(9, -1).toLowerCase(); // extract activity name
       
-      const matchesProject = exactProjectMatch || caseInsensitiveProjectMatch || isLeisureProjectMatch;
+      const matchesProject = exactProjectMatch || caseInsensitiveProjectMatch || taskNameMatchesProject || isLeisureProjectMatch;
       
       console.log('ActiveProjectsList - Checking log for project "' + projectName + '":', {
         logProject: logProject,
@@ -108,6 +110,7 @@ export const ActiveProjectsList = () => {
         isThisWeek: isThisWeek,
         exactProjectMatch: exactProjectMatch,
         caseInsensitiveProjectMatch: caseInsensitiveProjectMatch,
+        taskNameMatchesProject: taskNameMatchesProject,
         isLeisureProjectMatch: isLeisureProjectMatch,
         finalMatch: matchesProject,
         logDuration: log.duration,
