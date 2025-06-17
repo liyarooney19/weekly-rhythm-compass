@@ -278,7 +278,8 @@ export const TimeTracker = () => {
     
     if (selectedTask && selectedProjectData) {
       setCurrentTask(selectedTask.name);
-      setCurrentProjectName(selectedProjectData.name); // Store the project name
+      // Store just the project name, not the display name with life area
+      setCurrentProjectName(selectedProjectData.name);
       console.log('TimeTracker - Set current task to:', selectedTask.name);
       console.log('TimeTracker - Set current project name to:', selectedProjectData.name);
     } else {
