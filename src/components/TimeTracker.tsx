@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -68,6 +67,7 @@ export const TimeTracker = () => {
   const [actualStartTime, setActualStartTime] = useState(0);
 
   useEffect(() => {
+    console.log('TimeTracker - Initial load');
     loadData();
     restoreTimerState();
   }, []);
@@ -84,6 +84,7 @@ export const TimeTracker = () => {
         setTimeLeft(time => {
           const newTime = time - 1;
           if (newTime <= 0) {
+            console.log('TimeTracker - Timer reached zero, completing session');
             completeSession();
             return 0;
           }
@@ -113,6 +114,7 @@ export const TimeTracker = () => {
 
   const restoreTimerState = () => {
     const savedState = localStorage.getItem('timerState');
+    console.log('TimeTracker - Restoring timer state:', savedState);
     if (savedState) {
       try {
         const timerState: TimerState = JSON.parse(savedState);
@@ -123,11 +125,14 @@ export const TimeTracker = () => {
           const elapsedSeconds = Math.floor((now - timerState.actualStartTime) / 1000);
           const adjustedTimeLeft = Math.max(0, timerState.timeLeft - elapsedSeconds);
           
+          console.log('TimeTracker - Timer was running, adjusting time:', { elapsedSeconds, adjustedTimeLeft });
+          
           setTimeLeft(adjustedTimeLeft);
           setActualStartTime(timerState.actualStartTime);
           
           // If time ran out while away, complete the session
           if (adjustedTimeLeft === 0) {
+            console.log('TimeTracker - Time ran out while away, completing session');
             setIsRunning(false);
             setIsPaused(false);
             completeSessionWithState(timerState);
@@ -149,18 +154,23 @@ export const TimeTracker = () => {
         setCustomDuration(timerState.customDuration);
         setStartTime(timerState.startTime);
       } catch (error) {
-        console.error('Error restoring timer state:', error);
+        console.error('TimeTracker - Error restoring timer state:', error);
       }
     }
   };
 
   const loadData = () => {
+    console.log('TimeTracker - Loading data...');
+    
     // Load projects with tasks
     const savedProjects = localStorage.getItem('projects');
+    console.log('TimeTracker - Raw saved projects:', savedProjects);
+    
     if (savedProjects) {
       try {
         const parsedProjects = JSON.parse(savedProjects);
-        console.log('TimeTracker - Loaded projects:', parsedProjects);
+        console.log('TimeTracker - Parsed projects:', parsedProjects);
+        
         // Ensure we filter active projects and convert IDs to strings
         const activeProjects = parsedProjects
           .filter((p: Project) => p.status === 'active' || !p.status)
@@ -168,23 +178,33 @@ export const TimeTracker = () => {
             ...p,
             id: p.id.toString() // Ensure ID is string
           }));
-        console.log('TimeTracker - Active projects:', activeProjects);
+        console.log('TimeTracker - Active projects after filtering:', activeProjects);
         setProjects(activeProjects);
       } catch (error) {
-        console.error('Error parsing projects:', error);
+        console.error('TimeTracker - Error parsing projects:', error);
         setProjects([]);
       }
+    } else {
+      console.log('TimeTracker - No saved projects found');
+      setProjects([]);
     }
 
     // Load time logs
     const savedTimeLogs = localStorage.getItem('timeLogs');
+    console.log('TimeTracker - Raw saved time logs:', savedTimeLogs);
+    
     if (savedTimeLogs) {
       try {
-        setTimeLogs(JSON.parse(savedTimeLogs));
+        const parsedTimeLogs = JSON.parse(savedTimeLogs);
+        console.log('TimeTracker - Parsed time logs:', parsedTimeLogs);
+        setTimeLogs(parsedTimeLogs);
       } catch (error) {
-        console.error('Error parsing time logs:', error);
+        console.error('TimeTracker - Error parsing time logs:', error);
         setTimeLogs([]);
       }
+    } else {
+      console.log('TimeTracker - No saved time logs found');
+      setTimeLogs([]);
     }
   };
 
@@ -215,9 +235,16 @@ export const TimeTracker = () => {
   };
 
   const startTimer = () => {
-    console.log('TimeTracker - startTimer called', { selectedProject, selectedTaskId });
+    console.log('TimeTracker - startTimer called with state:', { 
+      selectedProject, 
+      selectedTaskId, 
+      projectsAvailable: projects.length,
+      selectedProjectObject: getSelectedProject(),
+      selectedTaskObject: getSelectedTask()
+    });
     
     if (!selectedProject) {
+      console.log('TimeTracker - No project selected');
       toast({
         title: "Error",
         description: "Please select a project before starting the timer",
@@ -227,6 +254,7 @@ export const TimeTracker = () => {
     }
 
     if (!selectedTaskId) {
+      console.log('TimeTracker - No task selected');
       toast({
         title: "Error",
         description: "Please select a task before starting the timer",
@@ -238,6 +266,9 @@ export const TimeTracker = () => {
     const selectedTask = getSelectedTask();
     if (selectedTask) {
       setCurrentTask(selectedTask.name);
+      console.log('TimeTracker - Set current task to:', selectedTask.name);
+    } else {
+      console.log('TimeTracker - Could not find selected task!');
     }
 
     const now = Date.now();
@@ -245,6 +276,8 @@ export const TimeTracker = () => {
     setIsPaused(false);
     setStartTime(now);
     setActualStartTime(now);
+    
+    console.log('TimeTracker - Timer started at:', new Date(now).toISOString());
     
     toast({
       title: "Timer Started",
@@ -273,6 +306,7 @@ export const TimeTracker = () => {
   };
 
   const stopTimer = () => {
+    console.log('TimeTracker - stopTimer called, timer state:', { isRunning, timeLeft, customDuration });
     if (isRunning && timeLeft < customDuration * 60) {
       completeSession();
     } else {
@@ -281,6 +315,7 @@ export const TimeTracker = () => {
   };
 
   const resetTimer = () => {
+    console.log('TimeTracker - resetTimer called');
     setIsRunning(false);
     setIsPaused(false);
     setTimeLeft(customDuration * 60);
@@ -295,27 +330,38 @@ export const TimeTracker = () => {
   };
 
   const completeSessionWithState = (timerState: TimerState) => {
+    console.log('TimeTracker - completeSessionWithState called with:', timerState);
+    
     const duration = timerState.customDuration * 60 - timerState.timeLeft;
     const durationInMinutes = Math.round(duration / 60);
     
+    console.log('TimeTracker - Session duration calculated:', { duration, durationInMinutes });
+    
     if (durationInMinutes < 1) {
+      console.log('TimeTracker - Duration less than 1 minute, resetting timer');
       resetTimer();
       return;
     }
 
+    const selectedProjectData = projects.find(p => p.id === timerState.selectedProject);
+    
     const newLog: TimeLog = {
       id: Date.now().toString(),
       task: timerState.currentTask,
       duration: durationInMinutes,
       type: timerState.timeType,
       timestamp: new Date().toISOString(),
-      project: projects.find(p => p.id === timerState.selectedProject)?.name || undefined,
+      project: selectedProjectData?.name || undefined,
       taskId: timerState.selectedTaskId || undefined
     };
+
+    console.log('TimeTracker - Creating new log entry:', newLog);
 
     const savedTimeLogs = localStorage.getItem('timeLogs');
     const currentLogs = savedTimeLogs ? JSON.parse(savedTimeLogs) : [];
     const updatedLogs = [...currentLogs, newLog];
+    
+    console.log('TimeTracker - Saving updated logs:', updatedLogs);
     localStorage.setItem('timeLogs', JSON.stringify(updatedLogs));
 
     updateProjectHours(timerState.selectedProject, timerState.selectedTaskId, durationInMinutes, timerState.timeType);
@@ -323,16 +369,23 @@ export const TimeTracker = () => {
   };
 
   const completeSession = () => {
+    console.log('TimeTracker - completeSession called');
+    
     const duration = customDuration * 60 - timeLeft;
     const durationInMinutes = Math.round(duration / 60);
     
+    console.log('TimeTracker - Session duration calculated:', { duration, durationInMinutes });
+    
     if (durationInMinutes < 1) {
+      console.log('TimeTracker - Duration less than 1 minute, resetting timer');
       resetTimer();
       return;
     }
 
     const selectedTask = getSelectedTask();
     const selectedProjectData = getSelectedProject();
+
+    console.log('TimeTracker - Selected data for completion:', { selectedTask, selectedProjectData });
 
     const newLog: TimeLog = {
       id: Date.now().toString(),
@@ -344,8 +397,12 @@ export const TimeTracker = () => {
       taskId: selectedTaskId || undefined
     };
 
+    console.log('TimeTracker - Creating new log entry:', newLog);
+
     const updatedLogs = [...timeLogs, newLog];
     setTimeLogs(updatedLogs);
+    
+    console.log('TimeTracker - Saving updated logs to localStorage:', updatedLogs);
     localStorage.setItem('timeLogs', JSON.stringify(updatedLogs));
 
     updateProjectHours(selectedProject, selectedTaskId, durationInMinutes, timeType);
@@ -359,13 +416,20 @@ export const TimeTracker = () => {
   };
 
   const updateProjectHours = (projectId: string, taskId: string, minutes: number, type: 'invested' | 'spent') => {
+    console.log('TimeTracker - updateProjectHours called:', { projectId, taskId, minutes, type });
+    
     const savedProjects = localStorage.getItem('projects');
     if (savedProjects) {
       const allProjects = JSON.parse(savedProjects);
+      console.log('TimeTracker - All projects before update:', allProjects);
+      
       const updatedProjects = allProjects.map((project: Project) => {
         if (project.id.toString() === projectId) {
+          console.log('TimeTracker - Updating project:', project.name);
+          
           const updatedTasks = project.tasks.map((task: Task) => {
             if (task.id.toString() === taskId) {
+              console.log('TimeTracker - Updating task:', task.name, 'adding', minutes/60, 'hours of', type);
               return {
                 ...task,
                 [type === 'invested' ? 'investedHours' : 'spentHours']: 
@@ -385,6 +449,7 @@ export const TimeTracker = () => {
         return project;
       });
       
+      console.log('TimeTracker - Updated projects:', updatedProjects);
       localStorage.setItem('projects', JSON.stringify(updatedProjects));
       // Reload data to update the projects state
       loadData();
@@ -408,11 +473,12 @@ export const TimeTracker = () => {
     setSelectedTaskId('');
   };
 
-  console.log('TimeTracker - Current state:', { 
+  console.log('TimeTracker - Current render state:', { 
     selectedProject, 
     selectedTaskId, 
     projectsCount: projects.length,
-    projects: projects.map(p => ({ id: p.id, name: p.name, tasksCount: p.tasks.length }))
+    projects: projects.map(p => ({ id: p.id, name: p.name, tasksCount: p.tasks.length })),
+    timeLogsCount: timeLogs.length
   });
 
   return (
