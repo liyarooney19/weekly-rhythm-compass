@@ -74,15 +74,23 @@ export const ActiveProjectsList = () => {
     console.log('ActiveProjectsList - Current time:', now.toLocaleDateString());
 
     // Filter time logs for this week and this project
+    // Match by either project name or by task names that belong to this project
     const thisWeekLogs = timeLogs.filter(log => {
       const logDate = new Date(log.timestamp);
       const isThisWeek = logDate >= startOfWeek;
+      
+      // Try to match by project name in the log
       const matchesProject = log.project === projectName;
+      
+      // Also try to match by checking if the task belongs to this project
+      const currentProject = projects.find(p => p.name === projectName);
+      const matchesTask = currentProject?.tasks.some(task => task.name === log.task) || false;
       
       console.log('ActiveProjectsList - Checking log:', {
         logProject: log.project,
         projectName: projectName,
         matchesProject: matchesProject,
+        matchesTask: matchesTask,
         logDate: logDate.toLocaleDateString(),
         logTime: logDate.toLocaleTimeString(),
         isThisWeek: isThisWeek,
@@ -91,30 +99,10 @@ export const ActiveProjectsList = () => {
         logTask: log.task
       });
       
-      return isThisWeek && matchesProject;
+      return isThisWeek && (matchesProject || matchesTask);
     });
 
     console.log('ActiveProjectsList - This week logs for', projectName, ':', thisWeekLogs);
-
-    // Also check if any logs match by task name instead of project name
-    const taskMatchLogs = timeLogs.filter(log => {
-      const logDate = new Date(log.timestamp);
-      const isThisWeek = logDate >= startOfWeek;
-      const matchesTask = log.task === projectName || log.task?.toLowerCase().includes(projectName.toLowerCase());
-      
-      if (matchesTask && isThisWeek) {
-        console.log('ActiveProjectsList - Found task match:', {
-          logTask: log.task,
-          projectName: projectName,
-          logDuration: log.duration,
-          logType: log.type
-        });
-      }
-      
-      return isThisWeek && matchesTask;
-    });
-
-    console.log('ActiveProjectsList - Task match logs for', projectName, ':', taskMatchLogs);
 
     const invested = thisWeekLogs
       .filter(log => log.type === 'invested')
