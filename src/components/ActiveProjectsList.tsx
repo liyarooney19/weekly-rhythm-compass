@@ -50,6 +50,12 @@ export const ActiveProjectsList = () => {
       console.log('ActiveProjectsList - All projects from localStorage:', parsedProjects);
       console.log('ActiveProjectsList - Active projects:', activeProjects);
       console.log('ActiveProjectsList - Project names:', activeProjects.map(p => p.name));
+      
+      // NEW: Check if "Self Development" project exists
+      const selfDevProject = parsedProjects.find(p => p.name === 'Self Development');
+      console.log('ActiveProjectsList - "Self Development" project found:', selfDevProject);
+      console.log('ActiveProjectsList - "Self Development" project status:', selfDevProject?.status);
+      
       setProjects(activeProjects);
     }
 
@@ -60,6 +66,11 @@ export const ActiveProjectsList = () => {
       console.log('ActiveProjectsList - All time logs:', parsedTimeLogs);
       console.log('ActiveProjectsList - Unique project names in timeLogs:', [...new Set(parsedTimeLogs.map(log => log.project))]);
       console.log('ActiveProjectsList - Unique task names in timeLogs:', [...new Set(parsedTimeLogs.map(log => log.task))]);
+      
+      // NEW: Check for "Self Development" time logs specifically
+      const selfDevLogs = parsedTimeLogs.filter(log => log.project === 'Self Development');
+      console.log('ActiveProjectsList - "Self Development" time logs:', selfDevLogs);
+      
       setTimeLogs(parsedTimeLogs);
     }
   };
