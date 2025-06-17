@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -8,8 +9,6 @@ interface Project {
   name: string;
   lifeArea: string;
   status: string;
-  investedHours?: number;
-  spentHours?: number;
   tasks: Task[];
 }
 
@@ -46,7 +45,6 @@ export const ActiveProjectsList = () => {
     if (savedProjects) {
       const parsedProjects = JSON.parse(savedProjects);
       const activeProjects = parsedProjects.filter((p: Project) => p.status === 'active' || !p.status);
-      console.log('ActiveProjectsList - Active projects:', activeProjects.map(p => p.name));
       setProjects(activeProjects);
     }
 
@@ -54,14 +52,6 @@ export const ActiveProjectsList = () => {
     const savedTimeLogs = localStorage.getItem('timeLogs');
     if (savedTimeLogs) {
       const parsedTimeLogs = JSON.parse(savedTimeLogs);
-      console.log('ActiveProjectsList - All time logs:', parsedTimeLogs);
-      console.log('ActiveProjectsList - Time logs with project info:', parsedTimeLogs.map(log => ({
-        task: log.task,
-        project: log.project,
-        duration: log.duration,
-        type: log.type,
-        timestamp: log.timestamp
-      })));
       setTimeLogs(parsedTimeLogs);
     }
   };
@@ -75,53 +65,23 @@ export const ActiveProjectsList = () => {
     startOfWeek.setDate(startOfWeek.getDate() - daysToMonday);
     startOfWeek.setHours(0, 0, 0, 0);
 
-    console.log('ActiveProjectsList - Getting hours for project:', projectName);
-    console.log('ActiveProjectsList - All available time logs:', timeLogs.length);
-
-    // Filter time logs for this week
+    // Filter time logs for this week and this specific project
     const thisWeekLogs = timeLogs.filter(log => {
       const logDate = new Date(log.timestamp);
       const isThisWeek = logDate >= startOfWeek;
       
+      if (!isThisWeek) return false;
+
+      // Simple, strict matching - only match if the log's project field exactly matches the project name
+      // OR if there's no project field but the task name exactly matches the project name
       const logProject = log.project || '';
       const taskName = log.task || '';
       
-      // Strategy 1: Exact project match (when log has project field)
       const exactProjectMatch = logProject === projectName;
+      const taskAsProjectMatch = !logProject && taskName === projectName;
       
-      // Strategy 2: Case insensitive project match (when log has project field)
-      const caseInsensitiveProjectMatch = logProject.toLowerCase() === projectName.toLowerCase();
-      
-      // Strategy 3: Task name matches project name (for time tracker logs without project field)
-      const taskNameMatchesProject = taskName.toLowerCase() === projectName.toLowerCase();
-      
-      // Strategy 4: For leisure activities - check if leisure task matches leisure project
-      const isLeisureProjectMatch = projectName.startsWith('Leisure (') && 
-                                    projectName.endsWith(')') &&
-                                    logProject === '' && // leisure logs don't have project field
-                                    taskName.toLowerCase() === projectName.slice(9, -1).toLowerCase(); // extract activity name
-      
-      const matchesProject = exactProjectMatch || caseInsensitiveProjectMatch || taskNameMatchesProject || isLeisureProjectMatch;
-      
-      console.log('ActiveProjectsList - Checking log for project "' + projectName + '":', {
-        logProject: logProject,
-        logTask: taskName,
-        logDate: logDate.toLocaleDateString(),
-        isThisWeek: isThisWeek,
-        exactProjectMatch: exactProjectMatch,
-        caseInsensitiveProjectMatch: caseInsensitiveProjectMatch,
-        taskNameMatchesProject: taskNameMatchesProject,
-        isLeisureProjectMatch: isLeisureProjectMatch,
-        finalMatch: matchesProject,
-        logDuration: log.duration,
-        logType: log.type
-      });
-      
-      return isThisWeek && matchesProject;
+      return exactProjectMatch || taskAsProjectMatch;
     });
-
-    console.log('ActiveProjectsList - This week logs for "' + projectName + '":', thisWeekLogs.length, 'logs found');
-    console.log('ActiveProjectsList - Matching logs details:', thisWeekLogs);
 
     const invested = thisWeekLogs
       .filter(log => log.type === 'invested')
@@ -130,8 +90,6 @@ export const ActiveProjectsList = () => {
     const spent = thisWeekLogs
       .filter(log => log.type === 'spent')
       .reduce((sum, log) => sum + log.duration, 0) / 60;
-
-    console.log('ActiveProjectsList - Final hours for "' + projectName + '":', { invested, spent, total: invested + spent });
 
     return { invested, spent, total: invested + spent };
   };
@@ -160,7 +118,7 @@ export const ActiveProjectsList = () => {
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <Clock className="h-5 w-5" />
-          Active Projects - This Week (Mon-Sun)
+          Active Projects - This Week
         </CardTitle>
       </CardHeader>
       <CardContent>
@@ -172,7 +130,6 @@ export const ActiveProjectsList = () => {
         ) : (
           <div className="space-y-4">
             {projects.map((project) => {
-              console.log('ActiveProjectsList - Processing project:', project.name);
               const weeklyHours = getThisWeekHours(project.name);
               const completedTasks = project.tasks.filter(t => t.completed).length;
               const totalTasks = project.tasks.length;
