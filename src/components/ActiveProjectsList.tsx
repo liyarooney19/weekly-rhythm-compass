@@ -54,7 +54,14 @@ export const ActiveProjectsList = () => {
     const savedTimeLogs = localStorage.getItem('timeLogs');
     if (savedTimeLogs) {
       const parsedTimeLogs = JSON.parse(savedTimeLogs);
-      console.log('ActiveProjectsList - Unique project names in timeLogs:', [...new Set(parsedTimeLogs.map(log => log.project))]);
+      console.log('ActiveProjectsList - All time logs:', parsedTimeLogs);
+      console.log('ActiveProjectsList - Time logs with project info:', parsedTimeLogs.map(log => ({
+        task: log.task,
+        project: log.project,
+        duration: log.duration,
+        type: log.type,
+        timestamp: log.timestamp
+      })));
       setTimeLogs(parsedTimeLogs);
     }
   };
@@ -69,34 +76,55 @@ export const ActiveProjectsList = () => {
     startOfWeek.setHours(0, 0, 0, 0);
 
     console.log('ActiveProjectsList - Getting hours for project:', projectName);
+    console.log('ActiveProjectsList - All available time logs:', timeLogs.length);
 
-    // Filter time logs for this week AND this specific project only
+    // Filter time logs for this week
     const thisWeekLogs = timeLogs.filter(log => {
       const logDate = new Date(log.timestamp);
       const isThisWeek = logDate >= startOfWeek;
       
-      // Only process logs that belong to this project
+      // Check multiple matching strategies
       const logProject = log.project || '';
-      const matchesProject = logProject === projectName || 
-                            logProject.trim() === projectName.trim() || 
-                            logProject.toLowerCase() === projectName.toLowerCase();
       
-      // Only log details for matching projects to reduce noise
-      if (matchesProject) {
-        console.log('ActiveProjectsList - Matching log found for "' + projectName + '":', {
-          logProject: logProject,
-          logDate: logDate.toLocaleDateString(),
-          isThisWeek: isThisWeek,
-          logDuration: log.duration,
-          logType: log.type,
-          logTask: log.task
-        });
-      }
+      // Strategy 1: Exact match
+      const exactMatch = logProject === projectName;
+      
+      // Strategy 2: Trimmed match
+      const trimmedMatch = logProject.trim() === projectName.trim();
+      
+      // Strategy 3: Case insensitive match
+      const caseInsensitiveMatch = logProject.toLowerCase() === projectName.toLowerCase();
+      
+      // Strategy 4: Check if task name contains project keywords for leisure activities
+      const taskName = log.task || '';
+      const isLeisureMatch = projectName.includes('(') && projectName.includes(')') && 
+                            taskName.toLowerCase().includes(projectName.split('(')[1].split(')')[0].toLowerCase());
+      
+      // Strategy 5: Check if project name contains task name (for cases like "walking" -> "Leisure (walking)")
+      const taskInProjectMatch = projectName.toLowerCase().includes(taskName.toLowerCase());
+      
+      const matchesProject = exactMatch || trimmedMatch || caseInsensitiveMatch || isLeisureMatch || taskInProjectMatch;
+      
+      console.log('ActiveProjectsList - Checking log for project "' + projectName + '":', {
+        logProject: logProject,
+        logTask: taskName,
+        logDate: logDate.toLocaleDateString(),
+        isThisWeek: isThisWeek,
+        exactMatch: exactMatch,
+        trimmedMatch: trimmedMatch,
+        caseInsensitiveMatch: caseInsensitiveMatch,
+        isLeisureMatch: isLeisureMatch,
+        taskInProjectMatch: taskInProjectMatch,
+        finalMatch: matchesProject,
+        logDuration: log.duration,
+        logType: log.type
+      });
       
       return isThisWeek && matchesProject;
     });
 
     console.log('ActiveProjectsList - This week logs for "' + projectName + '":', thisWeekLogs.length, 'logs found');
+    console.log('ActiveProjectsList - Matching logs details:', thisWeekLogs);
 
     const invested = thisWeekLogs
       .filter(log => log.type === 'invested')
