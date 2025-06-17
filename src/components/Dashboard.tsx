@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -347,11 +346,56 @@ export const Dashboard = () => {
         });
       });
     });
+
+    // Add strategy sessions
+    try {
+      const sessionHistoryString = localStorage.getItem('strategySessionHistory');
+      const sessionHistory: StrategySession[] = sessionHistoryString ? JSON.parse(sessionHistoryString) : [];
+      
+      sessionHistory.forEach((session, index) => {
+        if (session.completed) {
+          // Calculate total time for the session (assuming 50 minutes as mentioned)
+          const sessionDuration = 50 * 60; // 50 minutes in seconds
+          allActivities.push({
+            id: `strategy-${index}`,
+            task: 'Self-Strategy session',
+            project: 'Self Development',
+            duration: sessionDuration,
+            type: 'invested',
+            timestamp: session.date,
+            source: 'strategy'
+          });
+        }
+      });
+    } catch (error) {
+      console.error('Error loading strategy sessions:', error);
+    }
     
-    // Sort by timestamp and return recent 5
-    return allActivities
-      .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
-      .slice(0, 5);
+    // Sort by timestamp
+    const sortedActivities = allActivities
+      .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+
+    // Consolidate duplicate activities by task name and date
+    const consolidatedActivities = [];
+    const activityMap = new Map();
+
+    sortedActivities.forEach(activity => {
+      const dateKey = new Date(activity.timestamp).toDateString();
+      const key = `${activity.task}-${dateKey}`;
+      
+      if (activityMap.has(key)) {
+        // Combine duration with existing activity
+        const existing = activityMap.get(key);
+        existing.duration += activity.duration;
+        existing.combinedSessions = (existing.combinedSessions || 1) + 1;
+      } else {
+        // Add new activity
+        activityMap.set(key, { ...activity, combinedSessions: 1 });
+        consolidatedActivities.push(activityMap.get(key));
+      }
+    });
+
+    return consolidatedActivities.slice(0, 5);
   };
 
   const formatTime = (minutes: number) => {
@@ -450,7 +494,14 @@ export const Dashboard = () => {
               {getRecentActivity().map((activity: any) => (
                 <li key={activity.id} className="flex items-center justify-between p-3 bg-slate-50 rounded-lg hover:bg-slate-100 transition-colors">
                   <div>
-                    <div className="font-medium text-slate-800">{activity.task}</div>
+                    <div className="font-medium text-slate-800">
+                      {activity.task}
+                      {activity.combinedSessions > 1 && (
+                        <span className="text-sm text-slate-500 ml-2">
+                          ({activity.combinedSessions} sessions)
+                        </span>
+                      )}
+                    </div>
                     <div className="text-sm text-slate-500">
                       {activity.project && `${activity.project} - `}
                       {new Date(activity.timestamp).toLocaleDateString()} - {formatTime(activity.duration)}
