@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -39,11 +38,23 @@ interface TimeLog {
   taskId?: string;
 }
 
+interface TimerState {
+  isRunning: boolean;
+  isPaused: boolean;
+  timeLeft: number;
+  currentTask: string;
+  selectedProject: string;
+  selectedTaskId: string;
+  timeType: 'invested' | 'spent';
+  customDuration: number;
+  startTime: number;
+}
+
 export const TimeTracker = () => {
   const { toast } = useToast();
   const [isRunning, setIsRunning] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
-  const [timeLeft, setTimeLeft] = useState(25 * 60); // 25 minutes in seconds
+  const [timeLeft, setTimeLeft] = useState(25 * 60);
   const [currentTask, setCurrentTask] = useState('');
   const [selectedProject, setSelectedProject] = useState('');
   const [selectedTaskId, setSelectedTaskId] = useState('');
@@ -51,10 +62,16 @@ export const TimeTracker = () => {
   const [projects, setProjects] = useState<Project[]>([]);
   const [timeLogs, setTimeLogs] = useState<TimeLog[]>([]);
   const [customDuration, setCustomDuration] = useState(25);
+  const [startTime, setStartTime] = useState(0);
 
   useEffect(() => {
     loadData();
+    restoreTimerState();
   }, []);
+
+  useEffect(() => {
+    saveTimerState();
+  }, [isRunning, isPaused, timeLeft, currentTask, selectedProject, selectedTaskId, timeType, customDuration, startTime]);
 
   useEffect(() => {
     let interval: NodeJS.Timeout;
@@ -71,6 +88,62 @@ export const TimeTracker = () => {
     
     return () => clearInterval(interval);
   }, [isRunning, isPaused, timeLeft]);
+
+  const saveTimerState = () => {
+    const timerState: TimerState = {
+      isRunning,
+      isPaused,
+      timeLeft,
+      currentTask,
+      selectedProject,
+      selectedTaskId,
+      timeType,
+      customDuration,
+      startTime
+    };
+    localStorage.setItem('timerState', JSON.stringify(timerState));
+  };
+
+  const restoreTimerState = () => {
+    const savedState = localStorage.getItem('timerState');
+    if (savedState) {
+      try {
+        const timerState: TimerState = JSON.parse(savedState);
+        
+        // If timer was running, calculate elapsed time and adjust timeLeft
+        if (timerState.isRunning && !timerState.isPaused && timerState.startTime) {
+          const now = Date.now();
+          const elapsedSeconds = Math.floor((now - timerState.startTime) / 1000);
+          const adjustedTimeLeft = Math.max(0, timerState.timeLeft - elapsedSeconds);
+          
+          setTimeLeft(adjustedTimeLeft);
+          
+          // If time ran out while away, complete the session
+          if (adjustedTimeLeft === 0) {
+            setIsRunning(false);
+            setIsPaused(false);
+            // Don't auto-complete here, just reset
+          } else {
+            setIsRunning(timerState.isRunning);
+            setIsPaused(timerState.isPaused);
+          }
+        } else {
+          setIsRunning(timerState.isRunning);
+          setIsPaused(timerState.isPaused);
+          setTimeLeft(timerState.timeLeft);
+        }
+        
+        setCurrentTask(timerState.currentTask);
+        setSelectedProject(timerState.selectedProject);
+        setSelectedTaskId(timerState.selectedTaskId);
+        setTimeType(timerState.timeType);
+        setCustomDuration(timerState.customDuration);
+        setStartTime(timerState.startTime);
+      } catch (error) {
+        console.error('Error restoring timer state:', error);
+      }
+    }
+  };
 
   const loadData = () => {
     // Load projects with tasks
@@ -133,6 +206,7 @@ export const TimeTracker = () => {
 
     setIsRunning(true);
     setIsPaused(false);
+    setStartTime(Date.now());
     toast({
       title: "Timer Started",
       description: `Working on: ${selectedTask?.name}`
@@ -149,6 +223,7 @@ export const TimeTracker = () => {
 
   const resumeTimer = () => {
     setIsPaused(false);
+    setStartTime(Date.now() - ((customDuration * 60 - timeLeft) * 1000)); // Adjust start time
     toast({
       title: "Timer Resumed",
       description: "Timer has been resumed"
@@ -167,6 +242,9 @@ export const TimeTracker = () => {
     setIsRunning(false);
     setIsPaused(false);
     setTimeLeft(customDuration * 60);
+    setStartTime(0);
+    // Clear timer state from localStorage
+    localStorage.removeItem('timerState');
     toast({
       title: "Timer Reset",
       description: "Timer has been reset"
@@ -174,7 +252,7 @@ export const TimeTracker = () => {
   };
 
   const completeSession = () => {
-    const duration = customDuration * 60 - timeLeft; // Duration in seconds
+    const duration = customDuration * 60 - timeLeft;
     const durationInMinutes = Math.round(duration / 60);
     
     if (durationInMinutes < 1) {
@@ -240,6 +318,9 @@ export const TimeTracker = () => {
     setCurrentTask('');
     setSelectedProject('');
     setSelectedTaskId('');
+    setStartTime(0);
+    // Clear timer state from localStorage
+    localStorage.removeItem('timerState');
   };
 
   const setCustomTime = (minutes: number) => {
@@ -255,7 +336,7 @@ export const TimeTracker = () => {
 
   const handleProjectChange = (projectId: string) => {
     setSelectedProject(projectId);
-    setSelectedTaskId(''); // Reset task selection when project changes
+    setSelectedTaskId('');
   };
 
   return (

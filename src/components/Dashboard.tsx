@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -33,6 +34,7 @@ interface TimeLog {
   type: 'invested' | 'spent';
   timestamp: string;
   project?: string;
+  taskId?: string;
 }
 
 interface StrategySession {
@@ -42,10 +44,31 @@ interface StrategySession {
   agendaItems: any[];
 }
 
+interface LeisureActivity {
+  id: number;
+  name: string;
+  category: string;
+  frequency: string;
+  intention: string;
+  targetSessions: number;
+  completedSessions: number;
+  lastSession: string;
+  totalHours: number;
+  sessions: ActivitySession[];
+}
+
+interface ActivitySession {
+  id: number;
+  date: string;
+  duration: number;
+  notes?: string;
+}
+
 export const Dashboard = () => {
   const { toast } = useToast();
   const [projects, setProjects] = useState<Project[]>([]);
   const [timeLogs, setTimeLogs] = useState<TimeLog[]>([]);
+  const [leisureActivities, setLeisureActivities] = useState<LeisureActivity[]>([]);
 
   useEffect(() => {
     loadData();
@@ -61,28 +84,45 @@ export const Dashboard = () => {
     if (savedTimeLogs) {
       setTimeLogs(JSON.parse(savedTimeLogs));
     }
+
+    const savedLeisureActivities = localStorage.getItem('leisureActivities');
+    if (savedLeisureActivities) {
+      setLeisureActivities(JSON.parse(savedLeisureActivities));
+    }
   };
 
   const getWeeklyTimeData = () => {
     const now = new Date();
     const startOfWeek = new Date(now);
-    startOfWeek.setDate(now.getDate() - now.getDay()); // Start of current week (Sunday)
+    startOfWeek.setDate(now.getDate() - now.getDay());
     startOfWeek.setHours(0, 0, 0, 0);
 
+    // Get time from time logs
     const weeklyLogs = timeLogs.filter(log => {
       const logDate = new Date(log.timestamp);
       return logDate >= startOfWeek;
     });
 
-    const invested = weeklyLogs
+    const timeLogInvested = weeklyLogs
       .filter(log => log.type === 'invested')
-      .reduce((sum, log) => sum + log.duration, 0) / 60; // Convert to hours
+      .reduce((sum, log) => sum + log.duration, 0) / 60;
 
-    const spent = weeklyLogs
+    const timeLogSpent = weeklyLogs
       .filter(log => log.type === 'spent')
-      .reduce((sum, log) => sum + log.duration, 0) / 60; // Convert to hours
+      .reduce((sum, log) => sum + log.duration, 0) / 60;
 
-    return { invested, spent };
+    // Get time from leisure activity sessions
+    const leisureInvested = leisureActivities.reduce((total, activity) => {
+      const weeklyHours = activity.sessions
+        .filter(session => new Date(session.date) >= startOfWeek)
+        .reduce((sum, session) => sum + (session.duration / 60), 0);
+      return total + weeklyHours;
+    }, 0);
+
+    return { 
+      invested: timeLogInvested + leisureInvested, 
+      spent: timeLogSpent 
+    };
   };
 
   const formatHours = (hours: number) => {
@@ -94,14 +134,9 @@ export const Dashboard = () => {
 
   const getNextStrategyDate = () => {
     try {
-      // Get strategy day preference (default to Sunday)
       const strategyDay = localStorage.getItem('strategyDay') || 'Sunday';
-      
-      // Get session history
       const sessionHistoryString = localStorage.getItem('strategySessionHistory');
       const sessionHistory: StrategySession[] = sessionHistoryString ? JSON.parse(sessionHistoryString) : [];
-      
-      // Check if there's a current active session
       const currentSessionString = localStorage.getItem('currentStrategySession');
       const currentSession = currentSessionString ? JSON.parse(currentSessionString) : null;
       
@@ -109,7 +144,6 @@ export const Dashboard = () => {
       const targetDayIndex = days.indexOf(strategyDay);
       const today = new Date();
       
-      // If there's an active session today, show when it's due
       if (currentSession && !currentSession.completed) {
         const sessionDate = new Date(currentSession.date);
         const isToday = sessionDate.toDateString() === today.toDateString();
@@ -118,27 +152,22 @@ export const Dashboard = () => {
         }
       }
       
-      // Find the most recent completed session
       const completedSessions = sessionHistory.filter(session => session.completed);
       
       if (completedSessions.length > 0) {
-        // Sort by date descending to get the most recent
         completedSessions.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
         const lastSession = completedSessions[0];
         const lastSessionDate = new Date(lastSession.date);
         
-        // Calculate next strategy date from the last completed session
         let nextDate = new Date(lastSessionDate);
-        nextDate.setDate(lastSessionDate.getDate() + 7); // Add 7 days for next week
+        nextDate.setDate(lastSessionDate.getDate() + 7);
         
-        // Ensure it's on the correct day of the week
         while (nextDate.getDay() !== targetDayIndex) {
           nextDate.setDate(nextDate.getDate() + 1);
         }
         
         return nextDate.toLocaleDateString();
       } else {
-        // No completed sessions, calculate next occurrence of strategy day
         let daysUntil = targetDayIndex - today.getDay();
         if (daysUntil <= 0) daysUntil += 7;
         
@@ -164,7 +193,6 @@ export const Dashboard = () => {
       const targetDayIndex = days.indexOf(strategyDay);
       const today = new Date();
       
-      // If there's an active session today
       if (currentSession && !currentSession.completed) {
         const sessionDate = new Date(currentSession.date);
         const isToday = sessionDate.toDateString() === today.toDateString();
@@ -173,7 +201,6 @@ export const Dashboard = () => {
         }
       }
       
-      // Find the most recent completed session
       const completedSessions = sessionHistory.filter(session => session.completed);
       
       if (completedSessions.length > 0) {
@@ -338,10 +365,11 @@ export const Dashboard = () => {
                   <div>
                     <div className="font-medium text-slate-800">{log.task}</div>
                     <div className="text-sm text-slate-500">
-                      {new Date(log.timestamp).toLocaleDateString()} - {log.duration} minutes
+                      {log.project && `${log.project} - `}
+                      {new Date(log.timestamp).toLocaleDateString()} - {formatTime(log.duration)}
                     </div>
                   </div>
-                  <Badge variant="secondary">
+                  <Badge variant="secondary" className={log.type === 'invested' ? 'bg-green-100 text-green-800' : 'bg-amber-100 text-amber-800'}>
                     {log.type === 'invested' ? 'Invested' : 'Spent'}
                   </Badge>
                 </li>
