@@ -13,12 +13,9 @@ interface Project {
 }
 
 interface Task {
-  id: number;
+  id: string;
   name: string;
   completed: boolean;
-  estimatedHours: number;
-  investedHours: number;
-  spentHours: number;
 }
 
 interface TimeLog {
@@ -72,15 +69,11 @@ export const ActiveProjectsList = () => {
       
       if (!isThisWeek) return false;
 
-      // Simple, strict matching - only match if the log's project field exactly matches the project name
-      // OR if there's no project field but the task name exactly matches the project name
-      const logProject = log.project || '';
-      const taskName = log.task || '';
+      // Match by project field or by task name for standalone tasks
+      const projectMatch = log.project === projectName;
+      const taskMatch = !log.project && log.task === projectName;
       
-      const exactProjectMatch = logProject === projectName;
-      const taskAsProjectMatch = !logProject && taskName === projectName;
-      
-      return exactProjectMatch || taskAsProjectMatch;
+      return projectMatch || taskMatch;
     });
 
     const invested = thisWeekLogs

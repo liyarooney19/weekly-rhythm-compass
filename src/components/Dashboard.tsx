@@ -1,10 +1,8 @@
+
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
-import { Calendar, Clock, Target, BookOpen, PenTool, Brain, Users, Heart, Coffee, CheckCircle2, AlertCircle, CalendarDays, TrendingUp } from 'lucide-react';
-import { useToast } from '@/hooks/use-toast';
+import { Calendar, Clock, Target, CheckCircle2, AlertCircle, CalendarDays, TrendingUp } from 'lucide-react';
 import { ActiveProjectsList } from './ActiveProjectsList';
 
 interface Project {
@@ -12,18 +10,13 @@ interface Project {
   name: string;
   lifeArea: string;
   status: string;
-  investedHours?: number;
-  spentHours?: number;
   tasks: Task[];
 }
 
 interface Task {
-  id: number;
+  id: string;
   name: string;
   completed: boolean;
-  estimatedHours: number;
-  investedHours: number;
-  spentHours: number;
 }
 
 interface TimeLog {
@@ -43,56 +36,7 @@ interface StrategySession {
   agendaItems: any[];
 }
 
-interface LeisureActivity {
-  id: number;
-  name: string;
-  category: string;
-  frequency: string;
-  intention: string;
-  targetSessions: number;
-  completedSessions: number;
-  lastSession: string;
-  totalHours: number;
-  sessions: ActivitySession[];
-}
-
-interface ActivitySession {
-  id: number;
-  date: string;
-  duration: number;
-  notes?: string;
-}
-
-interface ReadingEntry {
-  id: string;
-  title: string;
-  author: string;
-  status: string;
-  type: string;
-  category: string;
-  sessions: ReadingSession[];
-}
-
-interface ReadingSession {
-  id: string;
-  date: string;
-  duration: number;
-  pages?: number;
-  notes?: string;
-}
-
-interface WritingEntry {
-  id: string;
-  title: string;
-  content: string;
-  category: string;
-  tags: string[];
-  createdAt: string;
-  updatedAt: string;
-}
-
 export const Dashboard = () => {
-  const { toast } = useToast();
   const [projects, setProjects] = useState<Project[]>([]);
   const [timeLogs, setTimeLogs] = useState<TimeLog[]>([]);
 
@@ -121,9 +65,7 @@ export const Dashboard = () => {
     startOfWeek.setDate(startOfWeek.getDate() - daysToMonday);
     startOfWeek.setHours(0, 0, 0, 0);
 
-    console.log('Dashboard - Calculating weekly time from Monday:', startOfWeek.toLocaleDateString());
-
-    // Get time from time logs ONLY - Monday to Sunday
+    // Get time from time logs - Monday to Sunday
     const weeklyLogs = timeLogs.filter(log => {
       const logDate = new Date(log.timestamp);
       return logDate >= startOfWeek;
@@ -136,11 +78,6 @@ export const Dashboard = () => {
     const timeLogSpent = weeklyLogs
       .filter(log => log.type === 'spent')
       .reduce((sum, log) => sum + log.duration, 0) / 60;
-
-    console.log('Dashboard - Weekly totals from timeLogs (Mon-Sun):', { 
-      invested: timeLogInvested, 
-      spent: timeLogSpent 
-    });
 
     return { 
       invested: timeLogInvested, 
@@ -253,42 +190,20 @@ export const Dashboard = () => {
   };
 
   const getRecentActivity = () => {
-    // Only use timeLogs - single source of truth
-    const allActivities = timeLogs.map(log => ({
+    // Get recent time logs
+    const sortedLogs = timeLogs
+      .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
+      .slice(0, 5);
+
+    return sortedLogs.map(log => ({
       id: log.id,
       task: log.task,
       project: log.project,
-      duration: log.duration * 60, // Convert to seconds for consistency
+      duration: log.duration,
       type: log.type,
       timestamp: log.timestamp,
       source: 'timeLog'
     }));
-    
-    // Sort by timestamp
-    const sortedActivities = allActivities
-      .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
-
-    // Consolidate duplicate activities by task name and date
-    const consolidatedActivities = [];
-    const activityMap = new Map();
-
-    sortedActivities.forEach(activity => {
-      const dateKey = new Date(activity.timestamp).toDateString();
-      const key = `${activity.task}-${dateKey}`;
-      
-      if (activityMap.has(key)) {
-        // Combine duration with existing activity
-        const existing = activityMap.get(key);
-        existing.duration += activity.duration;
-        existing.combinedSessions = (existing.combinedSessions || 1) + 1;
-      } else {
-        // Add new activity
-        activityMap.set(key, { ...activity, combinedSessions: 1 });
-        consolidatedActivities.push(activityMap.get(key));
-      }
-    });
-
-    return consolidatedActivities.slice(0, 5);
   };
 
   const formatTime = (minutes: number) => {
@@ -328,7 +243,7 @@ export const Dashboard = () => {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-green-600">{formatHours(weeklyTime.invested)}</div>
-            <p className="text-sm text-slate-500">This week's invested time (Mon-Sun)</p>
+            <p className="text-sm text-slate-500">This week's invested time</p>
           </CardContent>
         </Card>
 
@@ -338,7 +253,7 @@ export const Dashboard = () => {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-amber-600">{formatHours(weeklyTime.spent)}</div>
-            <p className="text-sm text-slate-500">This week's spent time (Mon-Sun)</p>
+            <p className="text-sm text-slate-500">This week's spent time</p>
           </CardContent>
         </Card>
       </div>
@@ -389,11 +304,6 @@ export const Dashboard = () => {
                   <div>
                     <div className="font-medium text-slate-800">
                       {activity.task}
-                      {activity.combinedSessions > 1 && (
-                        <span className="text-sm text-slate-500 ml-2">
-                          ({activity.combinedSessions} sessions)
-                        </span>
-                      )}
                     </div>
                     <div className="text-sm text-slate-500">
                       {activity.project && `${activity.project} - `}
