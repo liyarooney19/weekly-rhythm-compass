@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -46,8 +47,9 @@ export const ActiveProjectsList = () => {
     if (savedProjects) {
       const parsedProjects = JSON.parse(savedProjects);
       const activeProjects = parsedProjects.filter((p: Project) => p.status === 'active' || !p.status);
-      console.log('ActiveProjectsList - All projects:', parsedProjects);
+      console.log('ActiveProjectsList - All projects from localStorage:', parsedProjects);
       console.log('ActiveProjectsList - Active projects:', activeProjects);
+      console.log('ActiveProjectsList - Project names:', activeProjects.map(p => p.name));
       setProjects(activeProjects);
     }
 
@@ -56,6 +58,8 @@ export const ActiveProjectsList = () => {
     if (savedTimeLogs) {
       const parsedTimeLogs = JSON.parse(savedTimeLogs);
       console.log('ActiveProjectsList - All time logs:', parsedTimeLogs);
+      console.log('ActiveProjectsList - Unique project names in timeLogs:', [...new Set(parsedTimeLogs.map(log => log.project))]);
+      console.log('ActiveProjectsList - Unique task names in timeLogs:', [...new Set(parsedTimeLogs.map(log => log.task))]);
       setTimeLogs(parsedTimeLogs);
     }
   };
@@ -71,7 +75,6 @@ export const ActiveProjectsList = () => {
 
     console.log('ActiveProjectsList - Getting hours for project:', projectName);
     console.log('ActiveProjectsList - Week starts Monday:', startOfWeek.toLocaleDateString());
-    console.log('ActiveProjectsList - Current time:', now.toLocaleDateString());
 
     // Filter time logs for this week and this project
     // Match by either project name or by task names that belong to this project
@@ -86,13 +89,13 @@ export const ActiveProjectsList = () => {
       const currentProject = projects.find(p => p.name === projectName);
       const matchesTask = currentProject?.tasks.some(task => task.name === log.task) || false;
       
-      console.log('ActiveProjectsList - Checking log:', {
+      console.log('ActiveProjectsList - Checking log for project "' + projectName + '":', {
         logProject: log.project,
         projectName: projectName,
+        exactMatch: log.project === projectName,
         matchesProject: matchesProject,
         matchesTask: matchesTask,
         logDate: logDate.toLocaleDateString(),
-        logTime: logDate.toLocaleTimeString(),
         isThisWeek: isThisWeek,
         logDuration: log.duration,
         logType: log.type,
@@ -102,7 +105,7 @@ export const ActiveProjectsList = () => {
       return isThisWeek && (matchesProject || matchesTask);
     });
 
-    console.log('ActiveProjectsList - This week logs for', projectName, ':', thisWeekLogs);
+    console.log('ActiveProjectsList - This week logs for "' + projectName + '":', thisWeekLogs);
 
     const invested = thisWeekLogs
       .filter(log => log.type === 'invested')
@@ -112,7 +115,7 @@ export const ActiveProjectsList = () => {
       .filter(log => log.type === 'spent')
       .reduce((sum, log) => sum + log.duration, 0) / 60;
 
-    console.log('ActiveProjectsList - Final hours for', projectName, ':', { invested, spent, total: invested + spent });
+    console.log('ActiveProjectsList - Final hours for "' + projectName + '":', { invested, spent, total: invested + spent });
 
     return { invested, spent, total: invested + spent };
   };
@@ -153,6 +156,7 @@ export const ActiveProjectsList = () => {
         ) : (
           <div className="space-y-4">
             {projects.map((project) => {
+              console.log('ActiveProjectsList - Processing project:', project.name);
               const weeklyHours = getThisWeekHours(project.name);
               const completedTasks = project.tasks.filter(t => t.completed).length;
               const totalTasks = project.tasks.length;
