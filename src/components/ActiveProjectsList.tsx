@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -186,9 +185,11 @@ export const ActiveProjectsList = () => {
       'Work / Career': 'bg-purple-100 text-purple-800 border-purple-200',
       'Personal Growth': 'bg-blue-100 text-blue-800 border-blue-200',
       'Creative Projects': 'bg-orange-100 text-orange-800 border-orange-200',
-      'Health & Routines': 'bg-red-100 text-red-800 border-red-200',
+      'Health & Routines': 'bg-green-100 text-green-800 border-green-200',
+      'Health': 'bg-green-100 text-green-800 border-green-200',
       'Relationships / Family': 'bg-pink-100 text-pink-800 border-pink-200',
-      'Leisure/Hobby': 'bg-green-100 text-green-800 border-green-200'
+      'Leisure/Hobby': 'bg-amber-100 text-amber-800 border-amber-200',
+      'Leisure': 'bg-amber-100 text-amber-800 border-amber-200'
     };
     return colors[lifeArea as keyof typeof colors] || 'bg-slate-100 text-slate-800 border-slate-200';
   };
