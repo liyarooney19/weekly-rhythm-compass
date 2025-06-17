@@ -123,7 +123,7 @@ export const TimeTracker = () => {
         if (timerState.isRunning && !timerState.isPaused && timerState.actualStartTime) {
           const now = Date.now();
           const elapsedSeconds = Math.floor((now - timerState.actualStartTime) / 1000);
-          const adjustedTimeLeft = Math.max(0, timerState.timeLeft - elapsedSeconds);
+          const adjustedTimeLeft = Math.max(0, (timerState.timeLeft || 0) - elapsedSeconds);
           
           console.log('TimeTracker - Timer was running, adjusting time:', { elapsedSeconds, adjustedTimeLeft });
           
@@ -141,18 +141,18 @@ export const TimeTracker = () => {
             setIsPaused(false);
           }
         } else {
-          setIsRunning(timerState.isRunning);
-          setIsPaused(timerState.isPaused);
-          setTimeLeft(timerState.timeLeft);
+          setIsRunning(timerState.isRunning || false);
+          setIsPaused(timerState.isPaused || false);
+          setTimeLeft(timerState.timeLeft || 25 * 60);
           setActualStartTime(timerState.actualStartTime || 0);
         }
         
-        setCurrentTask(timerState.currentTask);
-        setSelectedProject(timerState.selectedProject);
-        setSelectedTaskId(timerState.selectedTaskId);
-        setTimeType(timerState.timeType);
-        setCustomDuration(timerState.customDuration);
-        setStartTime(timerState.startTime);
+        setCurrentTask(timerState.currentTask || '');
+        setSelectedProject(timerState.selectedProject || '');
+        setSelectedTaskId(timerState.selectedTaskId || '');
+        setTimeType(timerState.timeType || 'invested');
+        setCustomDuration(timerState.customDuration || 25);
+        setStartTime(timerState.startTime || 0);
       } catch (error) {
         console.error('TimeTracker - Error restoring timer state:', error);
       }
@@ -176,7 +176,13 @@ export const TimeTracker = () => {
           .filter((p: Project) => p.status === 'active' || !p.status)
           .map((p: Project) => ({
             ...p,
-            id: p.id.toString() // Ensure ID is string
+            id: p.id.toString(), // Ensure ID is string
+            tasks: (p.tasks || []).map((t: Task) => ({
+              ...t,
+              estimatedHours: t.estimatedHours || 0,
+              investedHours: t.investedHours || 0,
+              spentHours: t.spentHours || 0
+            }))
           }));
         console.log('TimeTracker - Active projects after filtering:', activeProjects);
         setProjects(activeProjects);
@@ -427,23 +433,28 @@ export const TimeTracker = () => {
         if (project.id.toString() === projectId) {
           console.log('TimeTracker - Updating project:', project.name);
           
-          const updatedTasks = project.tasks.map((task: Task) => {
+          const updatedTasks = (project.tasks || []).map((task: Task) => {
             if (task.id.toString() === taskId) {
               console.log('TimeTracker - Updating task:', task.name, 'adding', minutes/60, 'hours of', type);
               return {
                 ...task,
                 [type === 'invested' ? 'investedHours' : 'spentHours']: 
-                  (task[type === 'invested' ? 'investedHours' : 'spentHours'] || 0) + (minutes / 60)
+                  ((task[type === 'invested' ? 'investedHours' : 'spentHours'] as number) || 0) + (minutes / 60)
               };
             }
-            return task;
+            return {
+              ...task,
+              estimatedHours: task.estimatedHours || 0,
+              investedHours: task.investedHours || 0,
+              spentHours: task.spentHours || 0
+            };
           });
 
           return {
             ...project,
             tasks: updatedTasks,
             [type === 'invested' ? 'investedHours' : 'spentHours']: 
-              (project[type === 'invested' ? 'investedHours' : 'spentHours'] || 0) + (minutes / 60)
+              ((project[type === 'invested' ? 'investedHours' : 'spentHours'] as number) || 0) + (minutes / 60)
           };
         }
         return project;
@@ -575,7 +586,7 @@ export const TimeTracker = () => {
                         <div className="flex items-center justify-between w-full">
                           <span>{task.name}</span>
                           <span className="text-xs text-slate-500 ml-2">
-                            {task.investedHours.toFixed(1)}h / {task.estimatedHours}h
+                            {((task.investedHours || 0)).toFixed(1)}h / {(task.estimatedHours || 0)}h
                           </span>
                         </div>
                       </SelectItem>

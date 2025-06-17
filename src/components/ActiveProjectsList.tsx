@@ -102,7 +102,7 @@ export const ActiveProjectsList = () => {
       
       if (projectName && projectDataMap.has(projectName)) {
         const projectData = projectDataMap.get(projectName)!;
-        const hours = log.duration / 60; // Convert minutes to hours
+        const hours = (log.duration || 0) / 60; // Convert minutes to hours, handle undefined
         
         // Add to totals
         projectData.totalHours += hours;
@@ -144,11 +144,14 @@ export const ActiveProjectsList = () => {
     return colors[lifeArea as keyof typeof colors] || 'bg-slate-100 text-slate-800 border-slate-200';
   };
 
-  const formatHours = (hours: number) => {
-    if (hours < 1) {
-      return `${Math.round(hours * 60)}m`;
+  const formatHours = (hours: number | undefined) => {
+    // Handle undefined/null values
+    const validHours = hours || 0;
+    
+    if (validHours < 1) {
+      return `${Math.round(validHours * 60)}m`;
     }
-    return `${hours.toFixed(1)}h`;
+    return `${validHours.toFixed(1)}h`;
   };
 
   const projectsWithTime = getThisWeekProjectData();
