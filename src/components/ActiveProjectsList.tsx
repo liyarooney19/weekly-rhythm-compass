@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -62,17 +63,19 @@ export const ActiveProjectsList = () => {
 
   const getWeeklyHours = (projectName: string) => {
     const now = new Date();
-    const startOfWeek = new Date(now);
-    startOfWeek.setDate(now.getDate() - now.getDay()); // Start of current week (Sunday)
-    startOfWeek.setHours(0, 0, 0, 0);
+    // Use last 7 days instead of strict week boundaries
+    const sevenDaysAgo = new Date(now);
+    sevenDaysAgo.setDate(now.getDate() - 7);
+    sevenDaysAgo.setHours(0, 0, 0, 0);
 
     console.log('ActiveProjectsList - Getting weekly hours for project:', projectName);
-    console.log('ActiveProjectsList - Start of week:', startOfWeek);
+    console.log('ActiveProjectsList - Looking at last 7 days from:', sevenDaysAgo);
+    console.log('ActiveProjectsList - Current time:', now);
 
     // Use ONLY timeLogs - unified data source
-    const weeklyLogs = timeLogs.filter(log => {
+    const recentLogs = timeLogs.filter(log => {
       const logDate = new Date(log.timestamp);
-      const isThisWeek = logDate >= startOfWeek;
+      const isRecent = logDate >= sevenDaysAgo;
       const matchesProject = log.project === projectName;
       
       console.log('ActiveProjectsList - Checking log:', {
@@ -80,25 +83,25 @@ export const ActiveProjectsList = () => {
         logProject: log.project,
         projectName: projectName,
         matchesProject: matchesProject,
-        logDate: logDate,
-        isThisWeek: isThisWeek,
+        logDate: logDate.toLocaleString(),
+        isRecent: isRecent,
         logDuration: log.duration,
         logType: log.type
       });
       
-      return isThisWeek && matchesProject;
+      return isRecent && matchesProject;
     });
 
-    console.log('ActiveProjectsList - Weekly logs for', projectName, ':', weeklyLogs);
+    console.log('ActiveProjectsList - Recent logs for', projectName, ':', recentLogs);
 
-    const invested = weeklyLogs
+    const invested = recentLogs
       .filter(log => log.type === 'invested')
       .reduce((sum, log) => {
         console.log('ActiveProjectsList - Adding invested time:', log.duration, 'minutes');
         return sum + log.duration;
       }, 0) / 60; // Convert to hours
 
-    const spent = weeklyLogs
+    const spent = recentLogs
       .filter(log => log.type === 'spent')
       .reduce((sum, log) => {
         console.log('ActiveProjectsList - Adding spent time:', log.duration, 'minutes');
@@ -134,7 +137,7 @@ export const ActiveProjectsList = () => {
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <Clock className="h-5 w-5" />
-          Active Projects - This Week
+          Active Projects - Last 7 Days
         </CardTitle>
       </CardHeader>
       <CardContent>
@@ -166,7 +169,7 @@ export const ActiveProjectsList = () => {
                       <div className="text-lg font-bold text-slate-800">
                         {formatHours(weeklyHours.total)}
                       </div>
-                      <div className="text-xs text-slate-500">this week</div>
+                      <div className="text-xs text-slate-500">last 7 days</div>
                     </div>
                   </div>
 
