@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -56,13 +55,6 @@ export const ActiveProjectsList = () => {
     if (savedTimeLogs) {
       const parsedTimeLogs = JSON.parse(savedTimeLogs);
       console.log('ActiveProjectsList - Unique project names in timeLogs:', [...new Set(parsedTimeLogs.map(log => log.project))]);
-      console.log('ActiveProjectsList - All time logs:', parsedTimeLogs.map(log => ({ 
-        project: log.project, 
-        task: log.task, 
-        timestamp: log.timestamp,
-        projectLength: log.project ? log.project.length : 0,
-        projectBytes: log.project && typeof log.project === 'string' ? Array.from(log.project).map(c => c.charCodeAt(0)) : []
-      })));
       setTimeLogs(parsedTimeLogs);
     }
   };
@@ -77,42 +69,34 @@ export const ActiveProjectsList = () => {
     startOfWeek.setHours(0, 0, 0, 0);
 
     console.log('ActiveProjectsList - Getting hours for project:', projectName);
-    console.log('ActiveProjectsList - Project name length:', projectName.length);
-    console.log('ActiveProjectsList - Project name bytes:', Array.from(projectName).map(c => c.charCodeAt(0)));
-    console.log('ActiveProjectsList - Week starts Monday:', startOfWeek.toLocaleDateString());
 
-    // Filter time logs for this week and this project
+    // Filter time logs for this week AND this specific project only
     const thisWeekLogs = timeLogs.filter(log => {
       const logDate = new Date(log.timestamp);
       const isThisWeek = logDate >= startOfWeek;
       
-      // Match by project name in the log with detailed comparison
+      // Only process logs that belong to this project
       const logProject = log.project || '';
-      const exactMatch = logProject === projectName;
-      const trimmedMatch = logProject.trim() === projectName.trim();
-      const lowerCaseMatch = logProject.toLowerCase() === projectName.toLowerCase();
+      const matchesProject = logProject === projectName || 
+                            logProject.trim() === projectName.trim() || 
+                            logProject.toLowerCase() === projectName.toLowerCase();
       
-      console.log('ActiveProjectsList - Detailed matching for project "' + projectName + '":', {
-        logProject: logProject,
-        logProjectLength: logProject.length,
-        logProjectBytes: Array.from(logProject).map(c => c.charCodeAt(0)),
-        projectName: projectName,
-        projectNameLength: projectName.length,
-        projectNameBytes: Array.from(projectName).map(c => c.charCodeAt(0)),
-        exactMatch: exactMatch,
-        trimmedMatch: trimmedMatch,
-        lowerCaseMatch: lowerCaseMatch,
-        logDate: logDate.toLocaleDateString(),
-        isThisWeek: isThisWeek,
-        logDuration: log.duration,
-        logType: log.type,
-        logTask: log.task
-      });
+      // Only log details for matching projects to reduce noise
+      if (matchesProject) {
+        console.log('ActiveProjectsList - Matching log found for "' + projectName + '":', {
+          logProject: logProject,
+          logDate: logDate.toLocaleDateString(),
+          isThisWeek: isThisWeek,
+          logDuration: log.duration,
+          logType: log.type,
+          logTask: log.task
+        });
+      }
       
-      return isThisWeek && (exactMatch || trimmedMatch || lowerCaseMatch);
+      return isThisWeek && matchesProject;
     });
 
-    console.log('ActiveProjectsList - This week logs for "' + projectName + '":', thisWeekLogs);
+    console.log('ActiveProjectsList - This week logs for "' + projectName + '":', thisWeekLogs.length, 'logs found');
 
     const invested = thisWeekLogs
       .filter(log => log.type === 'invested')
