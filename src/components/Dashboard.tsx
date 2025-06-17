@@ -114,13 +114,16 @@ export const Dashboard = () => {
 
   const getWeeklyTimeData = () => {
     const now = new Date();
+    // Get Monday of this week
     const startOfWeek = new Date(now);
-    startOfWeek.setDate(now.getDate() - now.getDay());
+    const dayOfWeek = startOfWeek.getDay();
+    const daysToMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+    startOfWeek.setDate(startOfWeek.getDate() - daysToMonday);
     startOfWeek.setHours(0, 0, 0, 0);
 
-    console.log('Dashboard - Calculating weekly time from timeLogs only');
+    console.log('Dashboard - Calculating weekly time from Monday:', startOfWeek.toLocaleDateString());
 
-    // Get time from time logs ONLY - this is now our single source of truth
+    // Get time from time logs ONLY - Monday to Sunday
     const weeklyLogs = timeLogs.filter(log => {
       const logDate = new Date(log.timestamp);
       return logDate >= startOfWeek;
@@ -134,7 +137,7 @@ export const Dashboard = () => {
       .filter(log => log.type === 'spent')
       .reduce((sum, log) => sum + log.duration, 0) / 60;
 
-    console.log('Dashboard - Weekly totals from timeLogs:', { 
+    console.log('Dashboard - Weekly totals from timeLogs (Mon-Sun):', { 
       invested: timeLogInvested, 
       spent: timeLogSpent 
     });
@@ -325,7 +328,7 @@ export const Dashboard = () => {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-green-600">{formatHours(weeklyTime.invested)}</div>
-            <p className="text-sm text-slate-500">This week's invested time</p>
+            <p className="text-sm text-slate-500">This week's invested time (Mon-Sun)</p>
           </CardContent>
         </Card>
 
@@ -335,7 +338,7 @@ export const Dashboard = () => {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-amber-600">{formatHours(weeklyTime.spent)}</div>
-            <p className="text-sm text-slate-500">This week's spent time</p>
+            <p className="text-sm text-slate-500">This week's spent time (Mon-Sun)</p>
           </CardContent>
         </Card>
       </div>
