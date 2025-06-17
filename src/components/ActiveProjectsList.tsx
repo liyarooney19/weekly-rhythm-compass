@@ -28,6 +28,18 @@ interface TimeLog {
   taskId?: string;
 }
 
+interface ProjectTimeData {
+  project: Project;
+  totalHours: number;
+  investedHours: number;
+  spentHours: number;
+  taskEntries: {
+    taskName: string;
+    duration: number;
+    type: 'invested' | 'spent';
+  }[];
+}
+
 export const ActiveProjectsList = () => {
   const [projects, setProjects] = useState<Project[]>([]);
   const [timeLogs, setTimeLogs] = useState<TimeLog[]>([]);
@@ -53,7 +65,7 @@ export const ActiveProjectsList = () => {
     }
   };
 
-  const getThisWeekHours = (projectName: string) => {
+  const getThisWeekProjectData = (): ProjectTimeData[] => {
     const now = new Date();
     // Get Monday of this week
     const startOfWeek = new Date(now);
@@ -62,29 +74,62 @@ export const ActiveProjectsList = () => {
     startOfWeek.setDate(startOfWeek.getDate() - daysToMonday);
     startOfWeek.setHours(0, 0, 0, 0);
 
-    // Filter time logs for this week and this specific project
+    // Filter time logs for this week
     const thisWeekLogs = timeLogs.filter(log => {
       const logDate = new Date(log.timestamp);
-      const isThisWeek = logDate >= startOfWeek;
-      
-      if (!isThisWeek) return false;
-
-      // Match by project field or by task name for standalone tasks
-      const projectMatch = log.project === projectName;
-      const taskMatch = !log.project && log.task === projectName;
-      
-      return projectMatch || taskMatch;
+      return logDate >= startOfWeek;
     });
 
-    const invested = thisWeekLogs
-      .filter(log => log.type === 'invested')
-      .reduce((sum, log) => sum + log.duration, 0) / 60;
+    console.log('This week logs:', thisWeekLogs);
 
-    const spent = thisWeekLogs
-      .filter(log => log.type === 'spent')
-      .reduce((sum, log) => sum + log.duration, 0) / 60;
+    // Group logs by project
+    const projectDataMap = new Map<string, ProjectTimeData>();
 
-    return { invested, spent, total: invested + spent };
+    // Initialize all active projects
+    projects.forEach(project => {
+      projectDataMap.set(project.name, {
+        project,
+        totalHours: 0,
+        investedHours: 0,
+        spentHours: 0,
+        taskEntries: []
+      });
+    });
+
+    // Process time logs
+    thisWeekLogs.forEach(log => {
+      const projectName = log.project;
+      
+      if (projectName && projectDataMap.has(projectName)) {
+        const projectData = projectDataMap.get(projectName)!;
+        const hours = log.duration / 60; // Convert minutes to hours
+        
+        // Add to totals
+        projectData.totalHours += hours;
+        if (log.type === 'invested') {
+          projectData.investedHours += hours;
+        } else {
+          projectData.spentHours += hours;
+        }
+        
+        // Add task entry
+        projectData.taskEntries.push({
+          taskName: log.task,
+          duration: hours,
+          type: log.type
+        });
+        
+        console.log(`Added ${hours}h of ${log.type} time for project "${projectName}", task "${log.task}"`);
+      } else {
+        console.log(`Log not matched to any project:`, { 
+          logProject: log.project, 
+          logTask: log.task,
+          availableProjects: projects.map(p => p.name)
+        });
+      }
+    });
+
+    return Array.from(projectDataMap.values()).filter(data => data.totalHours > 0 || data.project.tasks.length > 0);
   };
 
   const getLifeAreaColor = (lifeArea: string) => {
@@ -106,6 +151,8 @@ export const ActiveProjectsList = () => {
     return `${hours.toFixed(1)}h`;
   };
 
+  const projectsWithTime = getThisWeekProjectData();
+
   return (
     <Card>
       <CardHeader>
@@ -115,15 +162,15 @@ export const ActiveProjectsList = () => {
         </CardTitle>
       </CardHeader>
       <CardContent>
-        {projects.length === 0 ? (
+        {projectsWithTime.length === 0 ? (
           <div className="text-center py-8 text-slate-500">
-            <p>No active projects found.</p>
-            <p className="text-sm">Create projects to start tracking time!</p>
+            <p>No time logged for active projects this week.</p>
+            <p className="text-sm">Complete tasks in Weekly Planning to see time here!</p>
           </div>
         ) : (
           <div className="space-y-4">
-            {projects.map((project) => {
-              const weeklyHours = getThisWeekHours(project.name);
+            {projectsWithTime.map((projectData) => {
+              const { project, totalHours, investedHours, spentHours, taskEntries } = projectData;
               const completedTasks = project.tasks.filter(t => t.completed).length;
               const totalTasks = project.tasks.length;
 
@@ -141,24 +188,24 @@ export const ActiveProjectsList = () => {
                     </div>
                     <div className="text-right">
                       <div className="text-lg font-bold text-slate-800">
-                        {formatHours(weeklyHours.total)}
+                        {formatHours(totalHours)}
                       </div>
                       <div className="text-xs text-slate-500">this week</div>
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-3 gap-4 text-sm">
+                  <div className="grid grid-cols-3 gap-4 text-sm mb-3">
                     <div className="text-center">
                       <div className="flex items-center justify-center gap-1 text-green-600">
                         <Target className="h-3 w-3" />
-                        <span className="font-medium">{formatHours(weeklyHours.invested)}</span>
+                        <span className="font-medium">{formatHours(investedHours)}</span>
                       </div>
                       <div className="text-xs text-slate-500">invested</div>
                     </div>
                     <div className="text-center">
                       <div className="flex items-center justify-center gap-1 text-amber-600">
                         <Timer className="h-3 w-3" />
-                        <span className="font-medium">{formatHours(weeklyHours.spent)}</span>
+                        <span className="font-medium">{formatHours(spentHours)}</span>
                       </div>
                       <div className="text-xs text-slate-500">spent</div>
                     </div>
@@ -169,6 +216,28 @@ export const ActiveProjectsList = () => {
                       <div className="text-xs text-slate-500">tasks</div>
                     </div>
                   </div>
+
+                  {/* Task entries for this week */}
+                  {taskEntries.length > 0 && (
+                    <div className="border-t pt-3">
+                      <div className="text-xs font-medium text-slate-600 mb-2">This Week's Tasks:</div>
+                      <div className="space-y-1">
+                        {taskEntries.map((entry, index) => (
+                          <div key={index} className="flex items-center justify-between text-xs">
+                            <span className="text-slate-600 truncate">{entry.taskName}</span>
+                            <div className="flex items-center gap-2">
+                              <span className={`font-medium ${entry.type === 'invested' ? 'text-green-600' : 'text-amber-600'}`}>
+                                {formatHours(entry.duration)}
+                              </span>
+                              <Badge variant="outline" className={`text-xs px-1 py-0 ${entry.type === 'invested' ? 'bg-green-50 text-green-700' : 'bg-amber-50 text-amber-700'}`}>
+                                {entry.type}
+                              </Badge>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
               );
             })}
