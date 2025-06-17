@@ -83,38 +83,32 @@ export const ActiveProjectsList = () => {
       const logDate = new Date(log.timestamp);
       const isThisWeek = logDate >= startOfWeek;
       
-      // Check multiple matching strategies
       const logProject = log.project || '';
-      
-      // Strategy 1: Exact match
-      const exactMatch = logProject === projectName;
-      
-      // Strategy 2: Trimmed match
-      const trimmedMatch = logProject.trim() === projectName.trim();
-      
-      // Strategy 3: Case insensitive match
-      const caseInsensitiveMatch = logProject.toLowerCase() === projectName.toLowerCase();
-      
-      // Strategy 4: Check if task name contains project keywords for leisure activities
       const taskName = log.task || '';
-      const isLeisureMatch = projectName.includes('(') && projectName.includes(')') && 
-                            taskName.toLowerCase().includes(projectName.split('(')[1].split(')')[0].toLowerCase());
       
-      // Strategy 5: Check if project name contains task name (for cases like "walking" -> "Leisure (walking)")
-      const taskInProjectMatch = projectName.toLowerCase().includes(taskName.toLowerCase());
+      // Strategy 1: Exact project match (most common case)
+      const exactProjectMatch = logProject === projectName;
       
-      const matchesProject = exactMatch || trimmedMatch || caseInsensitiveMatch || isLeisureMatch || taskInProjectMatch;
+      // Strategy 2: Case insensitive project match
+      const caseInsensitiveProjectMatch = logProject.toLowerCase() === projectName.toLowerCase();
+      
+      // Strategy 3: For leisure activities only - check if leisure task matches leisure project
+      // Only applies when project has format "Leisure (activity)" and task is the activity name
+      const isLeisureProjectMatch = projectName.startsWith('Leisure (') && 
+                                    projectName.endsWith(')') &&
+                                    logProject === '' && // leisure logs don't have project field
+                                    taskName.toLowerCase() === projectName.slice(9, -1).toLowerCase(); // extract activity name
+      
+      const matchesProject = exactProjectMatch || caseInsensitiveProjectMatch || isLeisureProjectMatch;
       
       console.log('ActiveProjectsList - Checking log for project "' + projectName + '":', {
         logProject: logProject,
         logTask: taskName,
         logDate: logDate.toLocaleDateString(),
         isThisWeek: isThisWeek,
-        exactMatch: exactMatch,
-        trimmedMatch: trimmedMatch,
-        caseInsensitiveMatch: caseInsensitiveMatch,
-        isLeisureMatch: isLeisureMatch,
-        taskInProjectMatch: taskInProjectMatch,
+        exactProjectMatch: exactProjectMatch,
+        caseInsensitiveProjectMatch: caseInsensitiveProjectMatch,
+        isLeisureProjectMatch: isLeisureProjectMatch,
         finalMatch: matchesProject,
         logDuration: log.duration,
         logType: log.type
