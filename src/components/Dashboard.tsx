@@ -46,22 +46,17 @@ export const Dashboard = () => {
     loadData();
   }, []);
 
-  const clearAllTrackingData = () => {
-    // Clear all tracking related data
+  const clearTimeTrackingData = () => {
+    // Clear only time tracking related data
     localStorage.removeItem('timeLogs');
-    localStorage.removeItem('weeklyTasks');
-    localStorage.removeItem('strategySessionHistory');
-    localStorage.removeItem('currentStrategySession');
-    localStorage.removeItem('readingEntries');
-    localStorage.removeItem('writingEntries');
-    localStorage.removeItem('leisureEntries');
+    localStorage.removeItem('timerState');
     
     // Reload data to refresh the dashboard
     loadData();
     
     toast({
-      title: "Data Cleared",
-      description: "All tracking data has been cleared for testing"
+      title: "Time Tracking Data Cleared",
+      description: "All time logs and timer state have been cleared for testing"
     });
   };
 
@@ -263,11 +258,11 @@ export const Dashboard = () => {
         </div>
         <Button 
           variant="outline" 
-          onClick={clearAllTrackingData}
+          onClick={clearTimeTrackingData}
           className="text-red-600 hover:text-red-700 hover:bg-red-50"
         >
           <Trash2 className="h-4 w-4 mr-2" />
-          Clear All Data
+          Clear Time Logs
         </Button>
       </div>
 
