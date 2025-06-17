@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -46,13 +45,18 @@ export const ActiveProjectsList = () => {
     const savedProjects = localStorage.getItem('projects');
     if (savedProjects) {
       const parsedProjects = JSON.parse(savedProjects);
-      setProjects(parsedProjects.filter((p: Project) => p.status === 'active' || !p.status));
+      console.log('ActiveProjectsList - All projects:', parsedProjects);
+      const activeProjects = parsedProjects.filter((p: Project) => p.status === 'active' || !p.status);
+      console.log('ActiveProjectsList - Active projects:', activeProjects);
+      setProjects(activeProjects);
     }
 
     // Load time logs - our single source of truth
     const savedTimeLogs = localStorage.getItem('timeLogs');
     if (savedTimeLogs) {
-      setTimeLogs(JSON.parse(savedTimeLogs));
+      const parsedTimeLogs = JSON.parse(savedTimeLogs);
+      console.log('ActiveProjectsList - All time logs:', parsedTimeLogs);
+      setTimeLogs(parsedTimeLogs);
     }
   };
 
@@ -62,19 +66,46 @@ export const ActiveProjectsList = () => {
     startOfWeek.setDate(now.getDate() - now.getDay()); // Start of current week (Sunday)
     startOfWeek.setHours(0, 0, 0, 0);
 
+    console.log('ActiveProjectsList - Getting weekly hours for project:', projectName);
+    console.log('ActiveProjectsList - Start of week:', startOfWeek);
+
     // Use ONLY timeLogs - unified data source
     const weeklyLogs = timeLogs.filter(log => {
       const logDate = new Date(log.timestamp);
-      return logDate >= startOfWeek && log.project === projectName;
+      const isThisWeek = logDate >= startOfWeek;
+      const matchesProject = log.project === projectName;
+      
+      console.log('ActiveProjectsList - Checking log:', {
+        logId: log.id,
+        logProject: log.project,
+        projectName: projectName,
+        matchesProject: matchesProject,
+        logDate: logDate,
+        isThisWeek: isThisWeek,
+        logDuration: log.duration,
+        logType: log.type
+      });
+      
+      return isThisWeek && matchesProject;
     });
+
+    console.log('ActiveProjectsList - Weekly logs for', projectName, ':', weeklyLogs);
 
     const invested = weeklyLogs
       .filter(log => log.type === 'invested')
-      .reduce((sum, log) => sum + log.duration, 0) / 60; // Convert to hours
+      .reduce((sum, log) => {
+        console.log('ActiveProjectsList - Adding invested time:', log.duration, 'minutes');
+        return sum + log.duration;
+      }, 0) / 60; // Convert to hours
 
     const spent = weeklyLogs
       .filter(log => log.type === 'spent')
-      .reduce((sum, log) => sum + log.duration, 0) / 60; // Convert to hours
+      .reduce((sum, log) => {
+        console.log('ActiveProjectsList - Adding spent time:', log.duration, 'minutes');
+        return sum + log.duration;
+      }, 0) / 60; // Convert to hours
+
+    console.log('ActiveProjectsList - Final hours for', projectName, ':', { invested, spent, total: invested + spent });
 
     return { invested, spent, total: invested + spent };
   };
