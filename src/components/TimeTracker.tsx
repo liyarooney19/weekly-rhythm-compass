@@ -49,6 +49,7 @@ interface TimerState {
   customDuration: number;
   startTime: number;
   actualStartTime: number;
+  currentProjectName: string; // Add this to store the project name
 }
 
 export const TimeTracker = () => {
@@ -65,6 +66,7 @@ export const TimeTracker = () => {
   const [customDuration, setCustomDuration] = useState(25);
   const [startTime, setStartTime] = useState(0);
   const [actualStartTime, setActualStartTime] = useState(0);
+  const [currentProjectName, setCurrentProjectName] = useState(''); // Add this state
 
   useEffect(() => {
     console.log('TimeTracker - Initial load');
@@ -74,7 +76,7 @@ export const TimeTracker = () => {
 
   useEffect(() => {
     saveTimerState();
-  }, [isRunning, isPaused, timeLeft, currentTask, selectedProject, selectedTaskId, timeType, customDuration, startTime, actualStartTime]);
+  }, [isRunning, isPaused, timeLeft, currentTask, selectedProject, selectedTaskId, timeType, customDuration, startTime, actualStartTime, currentProjectName]);
 
   useEffect(() => {
     let interval: NodeJS.Timeout;
@@ -107,7 +109,8 @@ export const TimeTracker = () => {
       timeType,
       customDuration,
       startTime,
-      actualStartTime
+      actualStartTime,
+      currentProjectName
     };
     localStorage.setItem('timerState', JSON.stringify(timerState));
   };
@@ -153,6 +156,7 @@ export const TimeTracker = () => {
         setTimeType(timerState.timeType || 'invested');
         setCustomDuration(timerState.customDuration || 25);
         setStartTime(timerState.startTime || 0);
+        setCurrentProjectName(timerState.currentProjectName || '');
       } catch (error) {
         console.error('TimeTracker - Error restoring timer state:', error);
       }
@@ -270,11 +274,15 @@ export const TimeTracker = () => {
     }
 
     const selectedTask = getSelectedTask();
-    if (selectedTask) {
+    const selectedProjectData = getSelectedProject();
+    
+    if (selectedTask && selectedProjectData) {
       setCurrentTask(selectedTask.name);
+      setCurrentProjectName(selectedProjectData.name); // Store the project name
       console.log('TimeTracker - Set current task to:', selectedTask.name);
+      console.log('TimeTracker - Set current project name to:', selectedProjectData.name);
     } else {
-      console.log('TimeTracker - Could not find selected task!');
+      console.log('TimeTracker - Could not find selected task or project!');
     }
 
     const now = Date.now();
@@ -327,6 +335,7 @@ export const TimeTracker = () => {
     setTimeLeft(customDuration * 60);
     setStartTime(0);
     setActualStartTime(0);
+    setCurrentProjectName(''); // Reset project name
     localStorage.removeItem('timerState');
     
     toast({
@@ -349,7 +358,8 @@ export const TimeTracker = () => {
       return;
     }
 
-    const selectedProjectData = projects.find(p => p.id === timerState.selectedProject);
+    // Use the stored project name from timer state
+    const projectName = timerState.currentProjectName;
     
     const newLog: TimeLog = {
       id: Date.now().toString(),
@@ -357,7 +367,7 @@ export const TimeTracker = () => {
       duration: durationInMinutes,
       type: timerState.timeType,
       timestamp: new Date().toISOString(),
-      project: selectedProjectData?.name || undefined,
+      project: projectName, // Use the stored project name
       taskId: timerState.selectedTaskId || undefined
     };
 
@@ -389,9 +399,8 @@ export const TimeTracker = () => {
     }
 
     const selectedTask = getSelectedTask();
-    const selectedProjectData = getSelectedProject();
 
-    console.log('TimeTracker - Selected data for completion:', { selectedTask, selectedProjectData });
+    console.log('TimeTracker - Selected data for completion:', { selectedTask, currentProjectName });
 
     const newLog: TimeLog = {
       id: Date.now().toString(),
@@ -399,7 +408,7 @@ export const TimeTracker = () => {
       duration: durationInMinutes,
       type: timeType,
       timestamp: new Date().toISOString(),
-      project: selectedProjectData?.name || undefined,
+      project: currentProjectName, // Use the stored project name instead of looking it up
       taskId: selectedTaskId || undefined
     };
 
@@ -489,7 +498,8 @@ export const TimeTracker = () => {
     selectedTaskId, 
     projectsCount: projects.length,
     projects: projects.map(p => ({ id: p.id, name: p.name, tasksCount: p.tasks.length })),
-    timeLogsCount: timeLogs.length
+    timeLogsCount: timeLogs.length,
+    currentProjectName
   });
 
   return (
@@ -652,9 +662,9 @@ export const TimeTracker = () => {
               <div className="bg-blue-50 p-4 rounded-lg">
                 <div className="text-sm text-blue-600 mb-1">Current Session</div>
                 <div className="font-medium text-blue-800">{getSelectedTask()?.name}</div>
-                {selectedProject && (
+                {currentProjectName && (
                   <div className="text-sm text-blue-600">
-                    Project: {getSelectedProject()?.name}
+                    Project: {currentProjectName}
                   </div>
                 )}
                 <div className="flex items-center gap-2 mt-2">
