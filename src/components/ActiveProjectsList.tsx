@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -60,7 +61,7 @@ export const ActiveProjectsList = () => {
         task: log.task, 
         timestamp: log.timestamp,
         projectLength: log.project ? log.project.length : 0,
-        projectBytes: log.project ? Array.from(log.project).map(c => c.charCodeAt(0)) : []
+        projectBytes: log.project && typeof log.project === 'string' ? Array.from(log.project).map(c => c.charCodeAt(0)) : []
       })));
       setTimeLogs(parsedTimeLogs);
     }
