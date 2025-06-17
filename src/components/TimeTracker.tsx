@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -48,6 +49,7 @@ interface TimerState {
   timeType: 'invested' | 'spent';
   customDuration: number;
   startTime: number;
+  actualStartTime: number;
 }
 
 export const TimeTracker = () => {
@@ -63,6 +65,7 @@ export const TimeTracker = () => {
   const [timeLogs, setTimeLogs] = useState<TimeLog[]>([]);
   const [customDuration, setCustomDuration] = useState(25);
   const [startTime, setStartTime] = useState(0);
+  const [actualStartTime, setActualStartTime] = useState(0);
 
   useEffect(() => {
     loadData();
@@ -71,19 +74,22 @@ export const TimeTracker = () => {
 
   useEffect(() => {
     saveTimerState();
-  }, [isRunning, isPaused, timeLeft, currentTask, selectedProject, selectedTaskId, timeType, customDuration, startTime]);
+  }, [isRunning, isPaused, timeLeft, currentTask, selectedProject, selectedTaskId, timeType, customDuration, startTime, actualStartTime]);
 
   useEffect(() => {
     let interval: NodeJS.Timeout;
     
     if (isRunning && !isPaused && timeLeft > 0) {
       interval = setInterval(() => {
-        setTimeLeft(time => time - 1);
+        setTimeLeft(time => {
+          const newTime = time - 1;
+          if (newTime <= 0) {
+            completeSession();
+            return 0;
+          }
+          return newTime;
+        });
       }, 1000);
-    }
-    
-    if (timeLeft === 0 && isRunning) {
-      completeSession();
     }
     
     return () => clearInterval(interval);
@@ -99,7 +105,8 @@ export const TimeTracker = () => {
       selectedTaskId,
       timeType,
       customDuration,
-      startTime
+      startTime,
+      actualStartTime
     };
     localStorage.setItem('timerState', JSON.stringify(timerState));
   };
@@ -111,26 +118,28 @@ export const TimeTracker = () => {
         const timerState: TimerState = JSON.parse(savedState);
         
         // If timer was running, calculate elapsed time and adjust timeLeft
-        if (timerState.isRunning && !timerState.isPaused && timerState.startTime) {
+        if (timerState.isRunning && !timerState.isPaused && timerState.actualStartTime) {
           const now = Date.now();
-          const elapsedSeconds = Math.floor((now - timerState.startTime) / 1000);
+          const elapsedSeconds = Math.floor((now - timerState.actualStartTime) / 1000);
           const adjustedTimeLeft = Math.max(0, timerState.timeLeft - elapsedSeconds);
           
           setTimeLeft(adjustedTimeLeft);
+          setActualStartTime(timerState.actualStartTime);
           
           // If time ran out while away, complete the session
           if (adjustedTimeLeft === 0) {
             setIsRunning(false);
             setIsPaused(false);
-            // Don't auto-complete here, just reset
+            completeSessionWithState(timerState);
           } else {
-            setIsRunning(timerState.isRunning);
-            setIsPaused(timerState.isPaused);
+            setIsRunning(true);
+            setIsPaused(false);
           }
         } else {
           setIsRunning(timerState.isRunning);
           setIsPaused(timerState.isPaused);
           setTimeLeft(timerState.timeLeft);
+          setActualStartTime(timerState.actualStartTime || 0);
         }
         
         setCurrentTask(timerState.currentTask);
@@ -204,9 +213,12 @@ export const TimeTracker = () => {
       setCurrentTask(selectedTask.name);
     }
 
+    const now = Date.now();
     setIsRunning(true);
     setIsPaused(false);
-    setStartTime(Date.now());
+    setStartTime(now);
+    setActualStartTime(now);
+    
     toast({
       title: "Timer Started",
       description: `Working on: ${selectedTask?.name}`
@@ -222,8 +234,11 @@ export const TimeTracker = () => {
   };
 
   const resumeTimer = () => {
+    const now = Date.now();
+    const elapsedBeforePause = customDuration * 60 - timeLeft;
+    setActualStartTime(now - (elapsedBeforePause * 1000));
     setIsPaused(false);
-    setStartTime(Date.now() - ((customDuration * 60 - timeLeft) * 1000)); // Adjust start time
+    
     toast({
       title: "Timer Resumed",
       description: "Timer has been resumed"
@@ -243,12 +258,41 @@ export const TimeTracker = () => {
     setIsPaused(false);
     setTimeLeft(customDuration * 60);
     setStartTime(0);
-    // Clear timer state from localStorage
+    setActualStartTime(0);
     localStorage.removeItem('timerState');
+    
     toast({
       title: "Timer Reset",
       description: "Timer has been reset"
     });
+  };
+
+  const completeSessionWithState = (timerState: TimerState) => {
+    const duration = timerState.customDuration * 60 - timerState.timeLeft;
+    const durationInMinutes = Math.round(duration / 60);
+    
+    if (durationInMinutes < 1) {
+      resetTimer();
+      return;
+    }
+
+    const newLog: TimeLog = {
+      id: Date.now().toString(),
+      task: timerState.currentTask,
+      duration: durationInMinutes,
+      type: timerState.timeType,
+      timestamp: new Date().toISOString(),
+      project: projects.find(p => p.id === timerState.selectedProject)?.name || undefined,
+      taskId: timerState.selectedTaskId || undefined
+    };
+
+    const savedTimeLogs = localStorage.getItem('timeLogs');
+    const currentLogs = savedTimeLogs ? JSON.parse(savedTimeLogs) : [];
+    const updatedLogs = [...currentLogs, newLog];
+    localStorage.setItem('timeLogs', JSON.stringify(updatedLogs));
+
+    updateProjectHours(timerState.selectedProject, timerState.selectedTaskId, durationInMinutes, timerState.timeType);
+    resetTimer();
   };
 
   const completeSession = () => {
@@ -277,16 +321,28 @@ export const TimeTracker = () => {
     setTimeLogs(updatedLogs);
     localStorage.setItem('timeLogs', JSON.stringify(updatedLogs));
 
-    // Update task and project hours
-    if (selectedProject && selectedTaskId) {
-      const updatedProjects = projects.map(project => {
-        if (project.id === selectedProject) {
-          const updatedTasks = project.tasks.map(task => {
-            if (task.id.toString() === selectedTaskId) {
+    updateProjectHours(selectedProject, selectedTaskId, durationInMinutes, timeType);
+
+    toast({
+      title: "Session Completed!",
+      description: `Logged ${durationInMinutes} minutes of ${timeType} time for: ${selectedTask?.name || currentTask}`
+    });
+
+    resetTimer();
+  };
+
+  const updateProjectHours = (projectId: string, taskId: string, minutes: number, type: 'invested' | 'spent') => {
+    const savedProjects = localStorage.getItem('projects');
+    if (savedProjects) {
+      const allProjects = JSON.parse(savedProjects);
+      const updatedProjects = allProjects.map((project: Project) => {
+        if (project.id === projectId) {
+          const updatedTasks = project.tasks.map((task: Task) => {
+            if (task.id.toString() === taskId) {
               return {
                 ...task,
-                [timeType === 'invested' ? 'investedHours' : 'spentHours']: 
-                  (task[timeType === 'invested' ? 'investedHours' : 'spentHours'] || 0) + (durationInMinutes / 60)
+                [type === 'invested' ? 'investedHours' : 'spentHours']: 
+                  (task[type === 'invested' ? 'investedHours' : 'spentHours'] || 0) + (minutes / 60)
               };
             }
             return task;
@@ -295,32 +351,16 @@ export const TimeTracker = () => {
           return {
             ...project,
             tasks: updatedTasks,
-            [timeType === 'invested' ? 'investedHours' : 'spentHours']: 
-              (project[timeType === 'invested' ? 'investedHours' : 'spentHours'] || 0) + (durationInMinutes / 60)
+            [type === 'invested' ? 'investedHours' : 'spentHours']: 
+              (project[type === 'invested' ? 'investedHours' : 'spentHours'] || 0) + (minutes / 60)
           };
         }
         return project;
       });
       
       localStorage.setItem('projects', JSON.stringify(updatedProjects));
-      setProjects(updatedProjects.filter(p => p.status === 'active' || !p.status));
+      setProjects(updatedProjects.filter((p: Project) => p.status === 'active' || !p.status));
     }
-
-    toast({
-      title: "Session Completed!",
-      description: `Logged ${durationInMinutes} minutes of ${timeType} time for: ${selectedTask?.name || currentTask}`
-    });
-
-    // Reset for next session
-    setIsRunning(false);
-    setIsPaused(false);
-    setTimeLeft(customDuration * 60);
-    setCurrentTask('');
-    setSelectedProject('');
-    setSelectedTaskId('');
-    setStartTime(0);
-    // Clear timer state from localStorage
-    localStorage.removeItem('timerState');
   };
 
   const setCustomTime = (minutes: number) => {

@@ -64,11 +64,41 @@ interface ActivitySession {
   notes?: string;
 }
 
+interface ReadingEntry {
+  id: string;
+  title: string;
+  author: string;
+  status: string;
+  type: string;
+  category: string;
+  sessions: ReadingSession[];
+}
+
+interface ReadingSession {
+  id: string;
+  date: string;
+  duration: number;
+  pages?: number;
+  notes?: string;
+}
+
+interface WritingEntry {
+  id: string;
+  title: string;
+  content: string;
+  category: string;
+  tags: string[];
+  createdAt: string;
+  updatedAt: string;
+}
+
 export const Dashboard = () => {
   const { toast } = useToast();
   const [projects, setProjects] = useState<Project[]>([]);
   const [timeLogs, setTimeLogs] = useState<TimeLog[]>([]);
   const [leisureActivities, setLeisureActivities] = useState<LeisureActivity[]>([]);
+  const [readingEntries, setReadingEntries] = useState<ReadingEntry[]>([]);
+  const [writingEntries, setWritingEntries] = useState<WritingEntry[]>([]);
 
   useEffect(() => {
     loadData();
@@ -89,6 +119,16 @@ export const Dashboard = () => {
     if (savedLeisureActivities) {
       setLeisureActivities(JSON.parse(savedLeisureActivities));
     }
+
+    const savedReadingEntries = localStorage.getItem('readingEntries');
+    if (savedReadingEntries) {
+      setReadingEntries(JSON.parse(savedReadingEntries));
+    }
+
+    const savedWritingEntries = localStorage.getItem('writingEntries');
+    if (savedWritingEntries) {
+      setWritingEntries(JSON.parse(savedWritingEntries));
+    }
   };
 
   const getWeeklyTimeData = () => {
@@ -97,7 +137,7 @@ export const Dashboard = () => {
     startOfWeek.setDate(now.getDate() - now.getDay());
     startOfWeek.setHours(0, 0, 0, 0);
 
-    // Get time from time logs
+    // Get time from time logs (projects and tasks)
     const weeklyLogs = timeLogs.filter(log => {
       const logDate = new Date(log.timestamp);
       return logDate >= startOfWeek;
@@ -119,8 +159,16 @@ export const Dashboard = () => {
       return total + weeklyHours;
     }, 0);
 
+    // Get time from reading sessions
+    const readingInvested = readingEntries.reduce((total, entry) => {
+      const weeklyHours = entry.sessions
+        .filter(session => new Date(session.date) >= startOfWeek)
+        .reduce((sum, session) => sum + (session.duration / 60), 0);
+      return total + weeklyHours;
+    }, 0);
+
     return { 
-      invested: timeLogInvested + leisureInvested, 
+      invested: timeLogInvested + leisureInvested + readingInvested, 
       spent: timeLogSpent 
     };
   };
@@ -229,42 +277,56 @@ export const Dashboard = () => {
     }
   };
 
-  const getLifeAreaIcon = (area: string) => {
-    const icons: { [key: string]: any } = {
-      'Work / Career': PenTool,
-      'Personal Growth': Brain,
-      'Creative Projects': PenTool,
-      'Health & Routines': Heart,
-      'Relationships / Family': Users,
-      'Leisure/Hobby': Coffee
-    };
-    return icons[area] || BookOpen;
-  };
-
-  const getLifeAreaColor = (lifeArea: string) => {
-    const colors = {
-      'Work / Career': 'bg-purple-100 text-purple-800',
-      'Personal Growth': 'bg-blue-100 text-blue-800',
-      'Creative Projects': 'bg-orange-100 text-orange-800',
-      'Health & Routines': 'bg-red-100 text-red-800',
-      'Relationships / Family': 'bg-pink-100 text-pink-800',
-      'Leisure/Hobby': 'bg-green-100 text-green-800'
-    };
-    return colors[lifeArea as keyof typeof colors] || 'bg-slate-100 text-slate-800';
-  };
-
   const getRecentActivity = () => {
-    const timeLogsString = localStorage.getItem('timeLogs');
-    if (!timeLogsString) return [];
-  
-    try {
-      const timeLogs = JSON.parse(timeLogsString);
-      const sortedLogs = timeLogs.sort((a: any, b: any) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
-      return sortedLogs.slice(0, 5);
-    } catch (error) {
-      console.error("Error parsing timeLogs from localStorage:", error);
-      return [];
-    }
+    const allActivities: any[] = [];
+    
+    // Add time logs
+    timeLogs.forEach(log => {
+      allActivities.push({
+        id: log.id,
+        task: log.task,
+        project: log.project,
+        duration: log.duration,
+        type: log.type,
+        timestamp: log.timestamp,
+        source: 'timeLog'
+      });
+    });
+    
+    // Add leisure activities
+    leisureActivities.forEach(activity => {
+      activity.sessions.forEach(session => {
+        allActivities.push({
+          id: `leisure-${session.id}`,
+          task: activity.name,
+          project: activity.category,
+          duration: session.duration,
+          type: 'invested',
+          timestamp: session.date,
+          source: 'leisure'
+        });
+      });
+    });
+    
+    // Add reading sessions
+    readingEntries.forEach(entry => {
+      entry.sessions.forEach(session => {
+        allActivities.push({
+          id: `reading-${session.id}`,
+          task: `Reading: ${entry.title}`,
+          project: entry.category,
+          duration: session.duration,
+          type: 'invested',
+          timestamp: session.date,
+          source: 'reading'
+        });
+      });
+    });
+    
+    // Sort by timestamp and return recent 5
+    return allActivities
+      .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
+      .slice(0, 5);
   };
 
   const formatTime = (minutes: number) => {
@@ -360,17 +422,17 @@ export const Dashboard = () => {
             </div>
           ) : (
             <ul className="space-y-2">
-              {getRecentActivity().map((log: any) => (
-                <li key={log.id} className="flex items-center justify-between p-3 bg-slate-50 rounded-lg hover:bg-slate-100 transition-colors">
+              {getRecentActivity().map((activity: any) => (
+                <li key={activity.id} className="flex items-center justify-between p-3 bg-slate-50 rounded-lg hover:bg-slate-100 transition-colors">
                   <div>
-                    <div className="font-medium text-slate-800">{log.task}</div>
+                    <div className="font-medium text-slate-800">{activity.task}</div>
                     <div className="text-sm text-slate-500">
-                      {log.project && `${log.project} - `}
-                      {new Date(log.timestamp).toLocaleDateString()} - {formatTime(log.duration)}
+                      {activity.project && `${activity.project} - `}
+                      {new Date(activity.timestamp).toLocaleDateString()} - {formatTime(activity.duration)}
                     </div>
                   </div>
-                  <Badge variant="secondary" className={log.type === 'invested' ? 'bg-green-100 text-green-800' : 'bg-amber-100 text-amber-800'}>
-                    {log.type === 'invested' ? 'Invested' : 'Spent'}
+                  <Badge variant="secondary" className={activity.type === 'invested' ? 'bg-green-100 text-green-800' : 'bg-amber-100 text-amber-800'}>
+                    {activity.type === 'invested' ? 'Invested' : 'Spent'}
                   </Badge>
                 </li>
               ))}
