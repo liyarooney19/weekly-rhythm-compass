@@ -158,14 +158,33 @@ export const TimeTracker = () => {
     // Load projects with tasks
     const savedProjects = localStorage.getItem('projects');
     if (savedProjects) {
-      const parsedProjects = JSON.parse(savedProjects);
-      setProjects(parsedProjects.filter((p: Project) => p.status === 'active' || !p.status));
+      try {
+        const parsedProjects = JSON.parse(savedProjects);
+        console.log('TimeTracker - Loaded projects:', parsedProjects);
+        // Ensure we filter active projects and convert IDs to strings
+        const activeProjects = parsedProjects
+          .filter((p: Project) => p.status === 'active' || !p.status)
+          .map((p: Project) => ({
+            ...p,
+            id: p.id.toString() // Ensure ID is string
+          }));
+        console.log('TimeTracker - Active projects:', activeProjects);
+        setProjects(activeProjects);
+      } catch (error) {
+        console.error('Error parsing projects:', error);
+        setProjects([]);
+      }
     }
 
     // Load time logs
     const savedTimeLogs = localStorage.getItem('timeLogs');
     if (savedTimeLogs) {
-      setTimeLogs(JSON.parse(savedTimeLogs));
+      try {
+        setTimeLogs(JSON.parse(savedTimeLogs));
+      } catch (error) {
+        console.error('Error parsing time logs:', error);
+        setTimeLogs([]);
+      }
     }
   };
 
@@ -176,20 +195,28 @@ export const TimeTracker = () => {
   };
 
   const getSelectedProject = () => {
-    return projects.find(p => p.id === selectedProject);
+    const project = projects.find(p => p.id === selectedProject);
+    console.log('TimeTracker - getSelectedProject:', selectedProject, 'found:', project);
+    return project;
   };
 
   const getAvailableTasks = () => {
     const project = getSelectedProject();
-    return project?.tasks || [];
+    const tasks = project?.tasks || [];
+    console.log('TimeTracker - getAvailableTasks for project:', selectedProject, 'tasks:', tasks);
+    return tasks;
   };
 
   const getSelectedTask = () => {
     const tasks = getAvailableTasks();
-    return tasks.find(t => t.id.toString() === selectedTaskId);
+    const task = tasks.find(t => t.id.toString() === selectedTaskId);
+    console.log('TimeTracker - getSelectedTask:', selectedTaskId, 'found:', task);
+    return task;
   };
 
   const startTimer = () => {
+    console.log('TimeTracker - startTimer called', { selectedProject, selectedTaskId });
+    
     if (!selectedProject) {
       toast({
         title: "Error",
@@ -336,7 +363,7 @@ export const TimeTracker = () => {
     if (savedProjects) {
       const allProjects = JSON.parse(savedProjects);
       const updatedProjects = allProjects.map((project: Project) => {
-        if (project.id === projectId) {
+        if (project.id.toString() === projectId) {
           const updatedTasks = project.tasks.map((task: Task) => {
             if (task.id.toString() === taskId) {
               return {
@@ -359,7 +386,8 @@ export const TimeTracker = () => {
       });
       
       localStorage.setItem('projects', JSON.stringify(updatedProjects));
-      setProjects(updatedProjects.filter((p: Project) => p.status === 'active' || !p.status));
+      // Reload data to update the projects state
+      loadData();
     }
   };
 
@@ -375,9 +403,17 @@ export const TimeTracker = () => {
   };
 
   const handleProjectChange = (projectId: string) => {
+    console.log('TimeTracker - handleProjectChange:', projectId);
     setSelectedProject(projectId);
     setSelectedTaskId('');
   };
+
+  console.log('TimeTracker - Current state:', { 
+    selectedProject, 
+    selectedTaskId, 
+    projectsCount: projects.length,
+    projects: projects.map(p => ({ id: p.id, name: p.name, tasksCount: p.tasks.length }))
+  });
 
   return (
     <div className="space-y-6">
@@ -445,56 +481,65 @@ export const TimeTracker = () => {
 
             {/* Project and Task Selection */}
             <div className="space-y-4">
-              <Select value={selectedProject} onValueChange={handleProjectChange} disabled={isRunning}>
-                <SelectTrigger className={!selectedProject && !isRunning ? "border-red-300 focus:border-red-500" : ""}>
-                  <SelectValue placeholder="Select project (required)" />
-                </SelectTrigger>
-                <SelectContent>
-                  {projects.map(project => (
-                    <SelectItem key={project.id} value={project.id}>
-                      {project.name} - {project.lifeArea}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <div>
+                <label className="text-sm font-medium mb-2 block">Project</label>
+                <Select value={selectedProject} onValueChange={handleProjectChange} disabled={isRunning}>
+                  <SelectTrigger className={!selectedProject && !isRunning ? "border-red-300 focus:border-red-500" : ""}>
+                    <SelectValue placeholder="Select project (required)" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {projects.map(project => (
+                      <SelectItem key={project.id} value={project.id}>
+                        {project.name} - {project.lifeArea}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
 
-              <Select value={selectedTaskId} onValueChange={setSelectedTaskId} disabled={isRunning || !selectedProject}>
-                <SelectTrigger className={!selectedTaskId && !isRunning ? "border-red-300 focus:border-red-500" : ""}>
-                  <SelectValue placeholder={selectedProject ? "Select task (required)" : "Select project first"} />
-                </SelectTrigger>
-                <SelectContent>
-                  {getAvailableTasks().map(task => (
-                    <SelectItem key={task.id} value={task.id.toString()}>
-                      <div className="flex items-center justify-between w-full">
-                        <span>{task.name}</span>
-                        <span className="text-xs text-slate-500 ml-2">
-                          {task.investedHours.toFixed(1)}h / {task.estimatedHours}h
-                        </span>
+              <div>
+                <label className="text-sm font-medium mb-2 block">Task</label>
+                <Select value={selectedTaskId} onValueChange={setSelectedTaskId} disabled={isRunning || !selectedProject}>
+                  <SelectTrigger className={!selectedTaskId && !isRunning ? "border-red-300 focus:border-red-500" : ""}>
+                    <SelectValue placeholder={selectedProject ? "Select task (required)" : "Select project first"} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {getAvailableTasks().map(task => (
+                      <SelectItem key={task.id} value={task.id.toString()}>
+                        <div className="flex items-center justify-between w-full">
+                          <span>{task.name}</span>
+                          <span className="text-xs text-slate-500 ml-2">
+                            {task.investedHours.toFixed(1)}h / {task.estimatedHours}h
+                          </span>
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div>
+                <label className="text-sm font-medium mb-2 block">Time Type</label>
+                <Select value={timeType} onValueChange={(value: 'invested' | 'spent') => setTimeType(value)} disabled={isRunning}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="invested">
+                      <div className="flex items-center gap-2">
+                        <Target className="h-4 w-4 text-green-500" />
+                        Invested Time
                       </div>
                     </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-
-              <Select value={timeType} onValueChange={(value: 'invested' | 'spent') => setTimeType(value)} disabled={isRunning}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="invested">
-                    <div className="flex items-center gap-2">
-                      <Target className="h-4 w-4 text-green-500" />
-                      Invested Time
-                    </div>
-                  </SelectItem>
-                  <SelectItem value="spent">
-                    <div className="flex items-center gap-2">
-                      <Timer className="h-4 w-4 text-amber-500" />
-                      Spent Time
-                    </div>
-                  </SelectItem>
-                </SelectContent>
-              </Select>
+                    <SelectItem value="spent">
+                      <div className="flex items-center gap-2">
+                        <Timer className="h-4 w-4 text-amber-500" />
+                        Spent Time
+                      </div>
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
 
             {/* Timer Controls */}

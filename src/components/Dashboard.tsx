@@ -117,7 +117,9 @@ export const Dashboard = () => {
 
     const savedLeisureActivities = localStorage.getItem('leisureActivities');
     if (savedLeisureActivities) {
-      setLeisureActivities(JSON.parse(savedLeisureActivities));
+      const activities = JSON.parse(savedLeisureActivities);
+      console.log('Dashboard - Loaded leisure activities:', activities);
+      setLeisureActivities(activities);
     }
 
     const savedReadingEntries = localStorage.getItem('readingEntries');
@@ -137,6 +139,8 @@ export const Dashboard = () => {
     startOfWeek.setDate(now.getDate() - now.getDay());
     startOfWeek.setHours(0, 0, 0, 0);
 
+    console.log('Dashboard - Calculating weekly time from:', startOfWeek);
+
     // Get time from time logs (projects and tasks)
     const weeklyLogs = timeLogs.filter(log => {
       const logDate = new Date(log.timestamp);
@@ -151,25 +155,46 @@ export const Dashboard = () => {
       .filter(log => log.type === 'spent')
       .reduce((sum, log) => sum + log.duration, 0) / 60;
 
+    console.log('Dashboard - Time logs this week:', { timeLogInvested, timeLogSpent });
+
     // Get time from leisure activity sessions
     const leisureInvested = leisureActivities.reduce((total, activity) => {
       const weeklyHours = activity.sessions
-        .filter(session => new Date(session.date) >= startOfWeek)
+        .filter(session => {
+          const sessionDate = new Date(session.date);
+          return sessionDate >= startOfWeek;
+        })
         .reduce((sum, session) => sum + (session.duration / 60), 0);
+      
+      console.log(`Dashboard - ${activity.name} weekly hours:`, weeklyHours);
       return total + weeklyHours;
     }, 0);
+
+    console.log('Dashboard - Total leisure invested this week:', leisureInvested);
 
     // Get time from reading sessions
     const readingInvested = readingEntries.reduce((total, entry) => {
       const weeklyHours = entry.sessions
-        .filter(session => new Date(session.date) >= startOfWeek)
+        .filter(session => {
+          const sessionDate = new Date(session.date);
+          return sessionDate >= startOfWeek;
+        })
         .reduce((sum, session) => sum + (session.duration / 60), 0);
       return total + weeklyHours;
     }, 0);
 
+    const totalInvested = timeLogInvested + leisureInvested + readingInvested;
+    const totalSpent = timeLogSpent;
+
+    console.log('Dashboard - Final weekly totals:', { 
+      invested: totalInvested, 
+      spent: totalSpent,
+      breakdown: { timeLogInvested, leisureInvested, readingInvested, timeLogSpent }
+    });
+
     return { 
-      invested: timeLogInvested + leisureInvested + readingInvested, 
-      spent: timeLogSpent 
+      invested: totalInvested, 
+      spent: totalSpent 
     };
   };
 
