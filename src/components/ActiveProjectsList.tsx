@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -79,7 +80,8 @@ export const ActiveProjectsList = () => {
       return logDate >= startOfWeek;
     });
 
-    console.log('This week logs:', thisWeekLogs);
+    console.log('ActiveProjectsList - This week logs:', thisWeekLogs);
+    console.log('ActiveProjectsList - Available projects:', projects.map(p => ({ id: p.id, name: p.name })));
 
     // Group logs by project
     const projectDataMap = new Map<string, ProjectTimeData>();
@@ -97,8 +99,12 @@ export const ActiveProjectsList = () => {
 
     // Helper function to find matching project for a log
     const findMatchingProject = (logProjectName: string): string | null => {
+      console.log('ActiveProjectsList - Trying to match log project:', logProjectName);
+      console.log('ActiveProjectsList - Available project names:', Array.from(projectDataMap.keys()));
+      
       // First try exact match
       if (projectDataMap.has(logProjectName)) {
+        console.log('ActiveProjectsList - Found exact match:', logProjectName);
         return logProjectName;
       }
       
@@ -106,6 +112,7 @@ export const ActiveProjectsList = () => {
       for (const projectName of projectDataMap.keys()) {
         if (projectName.toLowerCase().includes(logProjectName.toLowerCase()) || 
             logProjectName.toLowerCase().includes(projectName.toLowerCase())) {
+          console.log('ActiveProjectsList - Found partial match:', projectName, 'for log project:', logProjectName);
           return projectName;
         }
       }
@@ -115,22 +122,26 @@ export const ActiveProjectsList = () => {
         // Extract text in parentheses from project name
         const parenthesesMatch = projectName.match(/\(([^)]+)\)/);
         if (parenthesesMatch && parenthesesMatch[1].toLowerCase() === logProjectName.toLowerCase()) {
+          console.log('ActiveProjectsList - Found parentheses match:', projectName, 'for log project:', logProjectName);
           return projectName;
         }
         
         // Also check if the log project name matches the base name (before parentheses)
         const baseName = projectName.split('(')[0].trim();
         if (baseName.toLowerCase() === logProjectName.toLowerCase()) {
+          console.log('ActiveProjectsList - Found base name match:', projectName, 'for log project:', logProjectName);
           return projectName;
         }
       }
       
+      console.log('ActiveProjectsList - No match found for log project:', logProjectName);
       return null;
     };
 
     // Process time logs
     thisWeekLogs.forEach(log => {
       const logProjectName = log.project;
+      console.log('ActiveProjectsList - Processing log:', { task: log.task, project: logProjectName, duration: log.duration, type: log.type });
       
       if (logProjectName) {
         const matchingProjectName = findMatchingProject(logProjectName);
@@ -138,6 +149,8 @@ export const ActiveProjectsList = () => {
         if (matchingProjectName && projectDataMap.has(matchingProjectName)) {
           const projectData = projectDataMap.get(matchingProjectName)!;
           const hours = (log.duration || 0) / 60; // Convert minutes to hours, handle undefined
+          
+          console.log('ActiveProjectsList - Adding', hours, 'hours of', log.type, 'time to project:', matchingProjectName);
           
           // Add to totals
           projectData.totalHours += hours;
@@ -163,21 +176,28 @@ export const ActiveProjectsList = () => {
               type: log.type
             });
           }
-          
-          console.log(`Matched log project "${logProjectName}" to project "${matchingProjectName}"`);
-          console.log(`Added ${hours}h of ${log.type} time for project "${matchingProjectName}", task "${log.task}"`);
         } else {
-          console.log(`Log not matched to any project:`, { 
+          console.log('ActiveProjectsList - UNMATCHED LOG:', { 
             logProject: logProjectName, 
             logTask: log.task,
+            logDuration: log.duration,
+            logType: log.type,
             availableProjects: projects.map(p => p.name)
           });
         }
+      } else {
+        console.log('ActiveProjectsList - Log has no project name:', log);
       }
     });
 
-    // Return ALL active projects, not just those with time logged
-    return Array.from(projectDataMap.values());
+    const result = Array.from(projectDataMap.values());
+    console.log('ActiveProjectsList - Final project data:', result.map(p => ({ 
+      name: p.project.name, 
+      totalHours: p.totalHours, 
+      taskEntries: p.taskEntries 
+    })));
+    
+    return result;
   };
 
   const getLifeAreaColor = (lifeArea: string) => {
