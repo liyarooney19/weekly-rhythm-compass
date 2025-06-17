@@ -198,24 +198,32 @@ export const LeisureTracker = () => {
 
     // Check if activity already exists as project
     const existingProject = projects.find((p: any) => 
-      p.name.toLowerCase() === activity.name.toLowerCase() && p.lifeArea === 'Leisure'
+      p.name.toLowerCase() === activity.name.toLowerCase() && p.lifeArea === 'Leisure/Hobby'
     );
 
     if (!existingProject) {
       const leisureProject = {
         id: Date.now() + Math.random(),
         name: activity.name,
-        lifeArea: 'Leisure',
+        lifeArea: 'Leisure/Hobby',
         description: activity.intention,
         status: 'active',
         progress: 0,
         totalHours: 0,
         investedHours: 0,
         spentHours: 0,
-        tasks: []
+        tasks: [{
+          id: 1,
+          name: `${activity.name} Session`,
+          completed: false,
+          estimatedHours: 1,
+          investedHours: 0,
+          spentHours: 0
+        }]
       };
       projects.push(leisureProject);
       localStorage.setItem('projects', JSON.stringify(projects));
+      console.log('Created leisure project:', leisureProject);
     }
   };
 
@@ -282,7 +290,9 @@ export const LeisureTracker = () => {
     if (!activity) return;
 
     const timeLog = {
+      id: Date.now() + Math.random(),
       project: activity.name,
+      task: `${activity.name} Session`,
       duration: duration,
       type: 'invested' as const,
       timestamp: new Date().toISOString()
@@ -292,6 +302,7 @@ export const LeisureTracker = () => {
     const logs = savedLogs ? JSON.parse(savedLogs) : [];
     logs.push(timeLog);
     localStorage.setItem('timeLogs', JSON.stringify(logs));
+    console.log('Created timeLog entry:', timeLog);
 
     // Update the project hours in the projects list
     updateLeisureProjectHours(activity.name, duration);
@@ -306,16 +317,18 @@ export const LeisureTracker = () => {
       const hours = durationMinutes / 60;
       
       const updatedProjects = projects.map((project: any) => {
-        if (project.name.toLowerCase() === activityName.toLowerCase() && project.lifeArea === 'Leisure') {
+        if (project.name.toLowerCase() === activityName.toLowerCase() && project.lifeArea === 'Leisure/Hobby') {
           return {
             ...project,
-            investedHours: (project.investedHours || 0) + hours
+            investedHours: (project.investedHours || 0) + hours,
+            totalHours: (project.totalHours || 0) + hours
           };
         }
         return project;
       });
       
       localStorage.setItem('projects', JSON.stringify(updatedProjects));
+      console.log('Updated leisure project hours for:', activityName);
     } catch (error) {
       console.error('Error updating leisure project hours:', error);
     }
@@ -379,7 +392,7 @@ export const LeisureTracker = () => {
     try {
       const projects = JSON.parse(savedProjects);
       const updatedProjects = projects.filter((project: any) => 
-        !(project.name.toLowerCase() === activityName.toLowerCase() && project.lifeArea === 'Leisure')
+        !(project.name.toLowerCase() === activityName.toLowerCase() && project.lifeArea === 'Leisure/Hobby')
       );
       localStorage.setItem('projects', JSON.stringify(updatedProjects));
     } catch (error) {
