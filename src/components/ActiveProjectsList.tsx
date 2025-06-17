@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -85,7 +84,7 @@ export const ActiveProjectsList = () => {
     // Group logs by project
     const projectDataMap = new Map<string, ProjectTimeData>();
 
-    // Initialize all active projects
+    // Initialize all active projects - this ensures ALL active projects are shown
     projects.forEach(project => {
       projectDataMap.set(project.name, {
         project,
@@ -129,7 +128,8 @@ export const ActiveProjectsList = () => {
       }
     });
 
-    return Array.from(projectDataMap.values()).filter(data => data.totalHours > 0 || data.project.tasks.length > 0);
+    // Return ALL active projects, not just those with time logged
+    return Array.from(projectDataMap.values());
   };
 
   const getLifeAreaColor = (lifeArea: string) => {
