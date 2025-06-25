@@ -2,9 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Calendar, Clock, Target, CheckCircle2, AlertCircle, CalendarDays, TrendingUp, Trash2 } from 'lucide-react';
+import { Calendar, Clock, Target, CheckCircle2, AlertCircle, CalendarDays, TrendingUp, Trash2, PlayCircle, StopCircle } from 'lucide-react';
 import { ActiveProjectsList } from './ActiveProjectsList';
 import { useToast } from '@/hooks/use-toast';
+import { generateDemoProjects, generateDemoTimeLogs, generateDemoReadingItems, generateDemoStrategySession } from '@/utils/demoData';
 
 interface Project {
   id: string;
@@ -41,10 +42,19 @@ export const Dashboard = () => {
   const { toast } = useToast();
   const [projects, setProjects] = useState<Project[]>([]);
   const [timeLogs, setTimeLogs] = useState<TimeLog[]>([]);
+  const [isDemoMode, setIsDemoMode] = useState(false);
 
   useEffect(() => {
     loadData();
-  }, []);
+  }, [isDemoMode]);
+
+  const toggleDemoMode = () => {
+    setIsDemoMode(!isDemoMode);
+    toast({
+      title: isDemoMode ? "Demo Mode Disabled" : "Demo Mode Enabled",
+      description: isDemoMode ? "Switched back to your real data" : "Switched to demo data for presentation"
+    });
+  };
 
   const clearTimeTrackingData = () => {
     // Clear only time tracking related data
@@ -61,14 +71,38 @@ export const Dashboard = () => {
   };
 
   const loadData = () => {
-    const savedProjects = localStorage.getItem('projects');
-    if (savedProjects) {
-      setProjects(JSON.parse(savedProjects));
-    }
+    if (isDemoMode) {
+      // Load demo data
+      setProjects(generateDemoProjects());
+      setTimeLogs(generateDemoTimeLogs());
+      
+      // Set demo data in localStorage temporarily for other components
+      localStorage.setItem('demoProjects', JSON.stringify(generateDemoProjects()));
+      localStorage.setItem('demoTimeLogs', JSON.stringify(generateDemoTimeLogs()));
+      localStorage.setItem('demoReadingItems', JSON.stringify(generateDemoReadingItems()));
+      
+      // Set demo strategy session data
+      const demoStrategy = generateDemoStrategySession();
+      localStorage.setItem('demoStrategyDay', demoStrategy.strategyDay);
+      localStorage.setItem('demoStrategySessionHistory', JSON.stringify(demoStrategy.strategySessionHistory));
+    } else {
+      // Load real data
+      const savedProjects = localStorage.getItem('projects');
+      if (savedProjects) {
+        setProjects(JSON.parse(savedProjects));
+      }
 
-    const savedTimeLogs = localStorage.getItem('timeLogs');
-    if (savedTimeLogs) {
-      setTimeLogs(JSON.parse(savedTimeLogs));
+      const savedTimeLogs = localStorage.getItem('timeLogs');
+      if (savedTimeLogs) {
+        setTimeLogs(JSON.parse(savedTimeLogs));
+      }
+      
+      // Clear demo data from localStorage
+      localStorage.removeItem('demoProjects');
+      localStorage.removeItem('demoTimeLogs');
+      localStorage.removeItem('demoReadingItems');
+      localStorage.removeItem('demoStrategyDay');
+      localStorage.removeItem('demoStrategySessionHistory');
     }
   };
 
@@ -110,10 +144,16 @@ export const Dashboard = () => {
 
   const getNextStrategyDate = () => {
     try {
-      const strategyDay = localStorage.getItem('strategyDay') || 'Sunday';
-      const sessionHistoryString = localStorage.getItem('strategySessionHistory');
+      const strategyDay = isDemoMode 
+        ? localStorage.getItem('demoStrategyDay') || 'Sunday'
+        : localStorage.getItem('strategyDay') || 'Sunday';
+      const sessionHistoryString = isDemoMode
+        ? localStorage.getItem('demoStrategySessionHistory')
+        : localStorage.getItem('strategySessionHistory');
       const sessionHistory: StrategySession[] = sessionHistoryString ? JSON.parse(sessionHistoryString) : [];
-      const currentSessionString = localStorage.getItem('currentStrategySession');
+      const currentSessionString = isDemoMode
+        ? null  // Demo mode doesn't have current sessions
+        : localStorage.getItem('currentStrategySession');
       const currentSession = currentSessionString ? JSON.parse(currentSessionString) : null;
       
       const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
@@ -159,10 +199,16 @@ export const Dashboard = () => {
 
   const getDaysUntilNextStrategy = () => {
     try {
-      const strategyDay = localStorage.getItem('strategyDay') || 'Sunday';
-      const sessionHistoryString = localStorage.getItem('strategySessionHistory');
+      const strategyDay = isDemoMode 
+        ? localStorage.getItem('demoStrategyDay') || 'Sunday'
+        : localStorage.getItem('strategyDay') || 'Sunday';
+      const sessionHistoryString = isDemoMode
+        ? localStorage.getItem('demoStrategySessionHistory')
+        : localStorage.getItem('strategySessionHistory');
       const sessionHistory: StrategySession[] = sessionHistoryString ? JSON.parse(sessionHistoryString) : [];
-      const currentSessionString = localStorage.getItem('currentStrategySession');
+      const currentSessionString = isDemoMode
+        ? null
+        : localStorage.getItem('currentStrategySession');
       const currentSession = currentSessionString ? JSON.parse(currentSessionString) : null;
       
       const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
@@ -256,15 +302,48 @@ export const Dashboard = () => {
           <h1 className="text-3xl font-bold text-slate-800 mb-2">Dashboard</h1>
           <p className="text-slate-600">Your productivity overview and quick actions</p>
         </div>
-        <Button 
-          variant="outline" 
-          onClick={clearTimeTrackingData}
-          className="text-red-600 hover:text-red-700 hover:bg-red-50"
-        >
-          <Trash2 className="h-4 w-4 mr-2" />
-          Clear Time Logs
-        </Button>
+        <div className="flex gap-2">
+          <Button 
+            variant={isDemoMode ? "default" : "outline"}
+            onClick={toggleDemoMode}
+            className={isDemoMode ? "bg-blue-600 hover:bg-blue-700" : ""}
+          >
+            {isDemoMode ? (
+              <>
+                <StopCircle className="h-4 w-4 mr-2" />
+                Exit Demo
+              </>
+            ) : (
+              <>
+                <PlayCircle className="h-4 w-4 mr-2" />
+                Demo Mode
+              </>
+            )}
+          </Button>
+          {!isDemoMode && (
+            <Button 
+              variant="outline" 
+              onClick={clearTimeTrackingData}
+              className="text-red-600 hover:text-red-700 hover:bg-red-50"
+            >
+              <Trash2 className="h-4 w-4 mr-2" />
+              Clear Time Logs
+            </Button>
+          )}
+        </div>
       </div>
+
+      {isDemoMode && (
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+          <div className="flex items-center gap-2">
+            <PlayCircle className="h-5 w-5 text-blue-600" />
+            <div>
+              <p className="font-medium text-blue-900">Demo Mode Active</p>
+              <p className="text-sm text-blue-700">Showing sample data for presentation purposes</p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Quick Stats */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -321,7 +400,7 @@ export const Dashboard = () => {
         </Card>
 
         {/* Active Projects */}
-        <ActiveProjectsList />
+        <ActiveProjectsList isDemoMode={isDemoMode} />
       </div>
 
       {/* Recent Activity */}

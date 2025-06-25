@@ -1,11 +1,11 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { BookOpen, Plus, Share2, Trash2, Check, Clock } from 'lucide-react';
+import { BookOpen, Plus, Share2, Trash2, Check, Clock, PlayCircle, StopCircle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { generateDemoReadingItems } from '@/utils/demoData';
 
 interface ReadingItem {
   id: number;
@@ -20,6 +20,7 @@ interface ReadingItem {
 export const ReadingTracker = () => {
   const [newItem, setNewItem] = useState({ title: '', type: 'book', category: 'productivity' });
   const [readingItems, setReadingItems] = useState<ReadingItem[]>([]);
+  const [isDemoMode, setIsDemoMode] = useState(false);
   const { toast } = useToast();
   
   const categories = ['productivity', 'fiction', 'business', 'technology', 'health', 'philosophy'];
@@ -27,9 +28,22 @@ export const ReadingTracker = () => {
 
   useEffect(() => {
     loadReadingItems();
-  }, []);
+  }, [isDemoMode]);
+
+  const toggleDemoMode = () => {
+    setIsDemoMode(!isDemoMode);
+    toast({
+      title: isDemoMode ? "Demo Mode Disabled" : "Demo Mode Enabled",
+      description: isDemoMode ? "Switched back to your real reading data" : "Switched to demo reading data"
+    });
+  };
 
   const loadReadingItems = () => {
+    if (isDemoMode) {
+      setReadingItems(generateDemoReadingItems());
+      return;
+    }
+
     const saved = localStorage.getItem('readingItems');
     if (saved) {
       try {
@@ -83,6 +97,15 @@ export const ReadingTracker = () => {
   };
 
   const addReadingItem = () => {
+    if (isDemoMode) {
+      toast({
+        title: "Demo Mode Active",
+        description: "Cannot add items in demo mode",
+        variant: "destructive"
+      });
+      return;
+    }
+
     if (!newItem.title.trim()) {
       toast({
         title: "Error",
@@ -114,6 +137,15 @@ export const ReadingTracker = () => {
   };
 
   const updateItemStatus = (id: number, newStatus: 'in-progress' | 'read') => {
+    if (isDemoMode) {
+      toast({
+        title: "Demo Mode Active",
+        description: "Cannot modify items in demo mode",
+        variant: "destructive"
+      });
+      return;
+    }
+
     const updatedItems = readingItems.map(item => {
       if (item.id === id) {
         const updatedItem = { ...item, status: newStatus };
@@ -135,6 +167,15 @@ export const ReadingTracker = () => {
   };
 
   const deleteReadingItem = (id: number) => {
+    if (isDemoMode) {
+      toast({
+        title: "Demo Mode Active",
+        description: "Cannot delete items in demo mode",
+        variant: "destructive"
+      });
+      return;
+    }
+
     const updatedItems = readingItems.filter(item => item.id !== id);
     setReadingItems(updatedItems);
     localStorage.setItem('readingItems', JSON.stringify(updatedItems));
@@ -168,11 +209,42 @@ export const ReadingTracker = () => {
           <h1 className="text-3xl font-bold text-slate-800 mb-2">Reading Tracker</h1>
           <p className="text-slate-600">Books, podcasts, and articles tracking</p>
         </div>
-        <Button className="flex items-center gap-2">
-          <Share2 className="h-4 w-4" />
-          Share Reading List
-        </Button>
+        <div className="flex gap-2">
+          <Button 
+            variant={isDemoMode ? "default" : "outline"}
+            onClick={toggleDemoMode}
+            className={isDemoMode ? "bg-blue-600 hover:bg-blue-700" : ""}
+          >
+            {isDemoMode ? (
+              <>
+                <StopCircle className="h-4 w-4 mr-2" />
+                Exit Demo
+              </>
+            ) : (
+              <>
+                <PlayCircle className="h-4 w-4 mr-2" />
+                Demo Mode
+              </>
+            )}
+          </Button>
+          <Button className="flex items-center gap-2">
+            <Share2 className="h-4 w-4" />
+            Share Reading List
+          </Button>
+        </div>
       </div>
+
+      {isDemoMode && (
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+          <div className="flex items-center gap-2">
+            <PlayCircle className="h-5 w-5 text-blue-600" />
+            <div>
+              <p className="font-medium text-blue-900">Demo Mode Active</p>
+              <p className="text-sm text-blue-700">Showing sample reading data for presentation</p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Add New Item */}
       <Card>
@@ -188,11 +260,13 @@ export const ReadingTracker = () => {
               placeholder="Title..."
               value={newItem.title}
               onChange={(e) => setNewItem({...newItem, title: e.target.value})}
+              disabled={isDemoMode}
             />
             <select
               value={newItem.type}
               onChange={(e) => setNewItem({...newItem, type: e.target.value})}
-              className="px-3 py-2 border border-slate-300 rounded-md"
+              className="px-3 py-2 border border-slate-300 rounded-md disabled:bg-slate-100"
+              disabled={isDemoMode}
             >
               {types.map(type => (
                 <option key={type} value={type}>
@@ -203,7 +277,8 @@ export const ReadingTracker = () => {
             <select
               value={newItem.category}
               onChange={(e) => setNewItem({...newItem, category: e.target.value})}
-              className="px-3 py-2 border border-slate-300 rounded-md"
+              className="px-3 py-2 border border-slate-300 rounded-md disabled:bg-slate-100"
+              disabled={isDemoMode}
             >
               {categories.map(category => (
                 <option key={category} value={category}>
@@ -211,7 +286,7 @@ export const ReadingTracker = () => {
                 </option>
               ))}
             </select>
-            <Button onClick={addReadingItem}>Add Item</Button>
+            <Button onClick={addReadingItem} disabled={isDemoMode}>Add Item</Button>
           </div>
         </CardContent>
       </Card>

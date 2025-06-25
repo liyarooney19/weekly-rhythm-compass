@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -40,28 +39,47 @@ interface ProjectTimeData {
   }[];
 }
 
-export const ActiveProjectsList = () => {
+interface ActiveProjectsListProps {
+  isDemoMode?: boolean;
+}
+
+export const ActiveProjectsList = ({ isDemoMode = false }: ActiveProjectsListProps) => {
   const [projects, setProjects] = useState<Project[]>([]);
   const [timeLogs, setTimeLogs] = useState<TimeLog[]>([]);
 
   useEffect(() => {
     loadData();
-  }, []);
+  }, [isDemoMode]);
 
   const loadData = () => {
-    // Load projects
-    const savedProjects = localStorage.getItem('projects');
-    if (savedProjects) {
-      const parsedProjects = JSON.parse(savedProjects);
-      const activeProjects = parsedProjects.filter((p: Project) => p.status === 'active' || !p.status);
-      setProjects(activeProjects);
-    }
+    if (isDemoMode) {
+      // Load demo data
+      const demoProjects = localStorage.getItem('demoProjects');
+      const demoTimeLogs = localStorage.getItem('demoTimeLogs');
+      
+      if (demoProjects) {
+        const parsedProjects = JSON.parse(demoProjects);
+        const activeProjects = parsedProjects.filter((p: Project) => p.status === 'active' || !p.status);
+        setProjects(activeProjects);
+      }
+      
+      if (demoTimeLogs) {
+        setTimeLogs(JSON.parse(demoTimeLogs));
+      }
+    } else {
+      // Load real data
+      const savedProjects = localStorage.getItem('projects');
+      if (savedProjects) {
+        const parsedProjects = JSON.parse(savedProjects);
+        const activeProjects = parsedProjects.filter((p: Project) => p.status === 'active' || !p.status);
+        setProjects(activeProjects);
+      }
 
-    // Load time logs
-    const savedTimeLogs = localStorage.getItem('timeLogs');
-    if (savedTimeLogs) {
-      const parsedTimeLogs = JSON.parse(savedTimeLogs);
-      setTimeLogs(parsedTimeLogs);
+      const savedTimeLogs = localStorage.getItem('timeLogs');
+      if (savedTimeLogs) {
+        const parsedTimeLogs = JSON.parse(savedTimeLogs);
+        setTimeLogs(parsedTimeLogs);
+      }
     }
   };
 
